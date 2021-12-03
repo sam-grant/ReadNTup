@@ -1,6 +1,5 @@
 // Read ROOT trees 
 // Sam Grant
-// For data
 
 #include <iostream>
 #include <vector>
@@ -28,7 +27,7 @@ double pmax = 1.01 * mMu * gmagic; // 3127.1144
 double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
 double pLo = 750; 
-double pHi = 2750;
+double pHi = 2500;
 
 TTree *InitTree(string fileName, string treeName) { 
 
@@ -93,6 +92,7 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
   vector<TH1D*> Y_mom_slices_[n_stn];
   vector<TH1D*> pY_mom_slices_[n_stn];
   vector<TH1D*> p_mom_slices_[n_stn];
+  vector<TH1D*> alpha_mom_slices_[n_stn];
 
   // Momentum scans of theta_t modulo 
   vector<TH2D*> thetaY_vs_time_mod_slices_[n_stn];
@@ -141,8 +141,8 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
       // Store vertical offset correction fit
       TGraphErrors* gr_verticalOffsetFit = (TGraphErrors*)verticalOffsetCorrectionFile->Get(("MomBinnedAna/"+stns[i_stn]+"_ThetaY_vs_Time_Fit_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str());
-      if(gr_verticalOffsetFit==0) verticalOffsetFitsPerStn_.push_back(0);
-      else verticalOffsetFitsPerStn_.push_back(gr_verticalOffsetFit->GetFunction("DoubleExponentialFunc"));
+      //if(gr_verticalOffsetFit==0) verticalOffsetFitsPerStn_.push_back(0);
+      verticalOffsetFitsPerStn_.push_back(gr_verticalOffsetFit->GetFunction("DoubleExponentialFunc"));
 
       TH1D *h_p_mom_slices = new TH1D((stns[i_stn]+"_Momentum_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Track momentum [MeV];Tracks",  int(pmax), 0, pmax);
       p_mom_slices_[i_stn].push_back(h_p_mom_slices);
@@ -192,6 +192,7 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
   // For FR randomisation
   TRandom3 *rand = new TRandom3(12345);
+
    
   for(int64_t entry = 0; entry < nEntries; entry++) {
 
@@ -212,7 +213,7 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
     // Time cuts
     if (quality) {
 
-      if (time < g2Period*7 || time > g2Period*70) continue; 
+      if (time < g2Period*7 || time > g2Period*72) continue; 
       if (!vertexQual) continue;
 
     }
@@ -242,16 +243,18 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
     // End of variable definitions.
     
     ////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    // Fill stations invidually
     int stn_id = -1;
     if(stn==12) stn_id = 0;
     else if(stn==18) stn_id = 1;
     else cerr<<"Station "<<stn<<" not recognised";
 
     // Vertical offset correction
-    if(verticalOffsetCorrection) {
+    TF1 *verticalOffsetCorrectionFunc; 
 
-      // Vertical offset correction
-      TF1 *verticalOffsetCorrectionFunc; 
+    // Vertical offset correction
+    if(verticalOffsetCorrection) {
 
       // Slice momentum 
       for ( int i_slice = 0; i_slice < nSlices; i_slice++) { 
@@ -259,15 +262,11 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
         int lo = 0 + i_slice*step; 
         int hi = step + i_slice*step;
 
-        if(p >= double(lo) && p < double(hi)) {
-
-          verticalOffsetCorrectionFunc = (verticalOffsetFits_.at(stn_id)).at(i_slice);
-
-        }
+        if(p >= double(lo) && p < double(hi)) verticalOffsetCorrectionFunc = (verticalOffsetFits_.at(stn_id)).at(i_slice);
 
       }
 
-      theta_y = theta_y - verticalOffsetCorrectionFunc->Eval(time);
+      theta_y = theta_y - verticalOffsetCorrectionFunc->Eval(p);
 
     }    
 
@@ -346,9 +345,8 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
       }
 
     }
-    
-    //if(entry > 100) break;
-/*    if(100*float(entry) / nEntries > targetPerc) {
+      
+    /*if(100*float(entry) / nEntries > targetPerc) {
       cout << Form("Processed %.1f%%", 100*float(entry)/nEntries) << endl;
       targetPerc += 10;
     }*/
@@ -443,18 +441,18 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
 }
 
-int main(int argc, char *argv[]) {
+int main() { // } int argc, char *argv[]) {
 
    bool quality = true;
    bool verticalOffsetCorrection = true;
 
-   string inFileName = argv[1]; 
+/*   string inFileName = argv[1]; 
    string outFileName = argv[2]; 
-   string dataset = argv[3];
-/*
+   string dataset = argv[3];*/
+
    string inFileName = "/gm2/data/g2be/Production/Trees/Run1/trackRecoTrees_15921.root";
    string outFileName = "trackRecoPlots_15921_test.root";
-   string dataset = "Run-1a";*/
+   string dataset = "Run-1a";
 
    string treeName = "trackAndTrackCalo/tree";
 

@@ -11,8 +11,8 @@ elif [[ $dataset == "Run-1d" ]]; then
 fi
 
 files=""
-for file in `ls $datasetName`; do
-  	files=$files" "$datasetName/$file
+for file in `ls ../${datasetName}`; do
+  	files=$files" ../"$datasetName/$file
 done
 
 # Hadd these files (using Joe's script that does a few at a 

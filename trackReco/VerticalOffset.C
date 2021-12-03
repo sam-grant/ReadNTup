@@ -107,7 +107,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, string dataset = "Run-
     bool vertexQual = br.passDecayVertexQuality;
 
     // Time cuts
-    if (quality) if (!vertexQual) continue;
+    if (quality && !vertexQual) continue;
 
     int stn = br.station; 
 
