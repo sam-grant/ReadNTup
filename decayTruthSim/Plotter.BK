@@ -1,0 +1,505 @@
+// Read ROOT trees 
+// Sam Grant
+
+#include <iostream>
+#include <vector>
+
+#include "Plotter.h"
+#include "TFile.h"
+#include "TTree.h"
+#include "TTreeReader.h"
+#include "TH1D.h"
+#include "TH2D.h"
+#include "TMath.h"
+#include "TVector3.h"
+#include "TLorentzVector.h"
+#include "Math/Vector3D.h"
+#include "Math/Vector4D.h"
+
+using namespace std;
+
+double omegaAMagic = 0.00143934; // from gm2geom consts / kHz 
+double g2Period = (2*TMath::Pi()/omegaAMagic) * 1e-3; // 4.3653239 us
+double mMu = 105.6583715; // MeV
+double aMu = 11659208.9e-10; 
+double gmagic = std::sqrt( 1.+1./aMu );
+double pmax = 1.01 * mMu * gmagic;
+double eMass = 0.510999;
+
+TTree *InitTree(string fileName, string treeName) { 
+
+   // ++++++++++++++ Open tree and load branches ++++++++++++++
+   // Get file
+   TFile *fin = TFile::Open(fileName.c_str());
+   cout<<"\nOpened tree:\t"<<fileName<<" "<<fin<<endl;
+
+   // Get tree
+   TTree *tree = (TTree*)fin->Get(treeName.c_str());
+
+   cout<<"\nOpened tree:"<<treeName<<" "<<tree<<" from file "<<fileName<<" "<<fin<<endl;
+
+   return tree;
+
+}
+
+double ModTime(double time) {
+
+  double g2fracTime = time / g2Period;
+  int g2fracTimeInt = int(g2fracTime);
+  double g2ModTime = (g2fracTime - g2fracTimeInt) * g2Period;
+
+  return g2ModTime;
+
+}
+
+void Run(TTree *tree, TFile *output, bool quality) {
+
+   // 0: WORLD; 1: AAR; 2: MRF
+   int frame = 1; 
+
+   bool WORLD = false;
+   bool AAR = false;
+   bool MRF = false;
+
+   double boostFactor;
+
+   if(frame==0) { 
+      WORLD = true;
+      // Factor of two is just to make sure we're not chopping the tops of the vertcial angle at low momentum 
+      boostFactor = 5e3*(1/gmagic);// 2/gmagic; // 1/15;//20.;
+   }
+   else if(frame==1) {
+      AAR = true;
+      boostFactor = 5e3*(1/gmagic); //posiMom_MRF1/15;//20.;
+      
+   }
+   else if(frame==2) {
+      MRF = true;
+      boostFactor = 1.0e3;///20.;//2/gmagic;
+   }
+
+   //boostFactor = 2.0e3;
+   // Book histograms
+   // Bin out FR
+   double binWidth = 0.148936;
+
+   TH1D *momentum = new TH1D("Momentum", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax); 
+
+   TH1D *momY = new TH1D("MomentumY", ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
+   TH1D *momX = new TH1D("MomentumX", ";Track momentum X [MeV];Tracks", int(pmax), -pmax, pmax); 
+   TH1D *momZ = new TH1D("MomentumZ", ";Track momentum Z [MeV];Tracks", int(pmax), -pmax, pmax); 
+
+   TH1D *wiggle = new TH1D("Wiggle", ";Decay time [#mus];Tracks", 2700, 0, 2700*0.148936);
+   TH1D *wiggle_mod = new TH1D("Wiggle_Modulo", ";t_{g#minus2}^{mod} [#mus];Tracks / 50 ns", 87, 0, g2Period); // int(g2Period/0.148936), 0, g2Period); // 87 bins for 50 ns
+   TH1D *thetaY = new TH1D("ThetaY", ";#theta_{y} [mrad];Tracks", 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//-2*TMath::Pi()*boostFactor,  2*TMath::Pi()*boostFactor);//180, -60*boostFactor , 60*boostFactor );
+
+   cout<<"Limits\t"<<-TMath::Pi()*boostFactor<<", "<<TMath::Pi()*boostFactor<<endl;
+   TH2D *thetaY_vs_time = new TH2D("ThetaY_vs_Time", ";Decay time [#mus]; #theta_{y} [mrad] / 149 ns ", 2700, 0, 2700*0.148936, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//-2*TMath::Pi()*boostFactor,  2*TMath::Pi()*boostFactor);//180, -60*boostFactor, 60*boostFactor);
+   TH2D *thetaY_vs_time_mod = new TH2D("ThetaY_vs_Time_Modulo", ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad] / 50 ns", 87, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//-2*TMath::Pi()*boostFactor,  2*TMath::Pi()*boostFactor);
+
+   // TH2D *WORLD_decayZ_vs_decayX = new TH2D("WORLD_DecayZ_vs_DecayX", ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
+   TH2D *decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
+   //if(AAR) decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
+   //else if(MRF) decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
+
+   // Momentum scans of mod 
+   vector<TH2D*> mom_slices_;
+   vector<TH2D*> mom_sym_cuts_;
+   vector<TH2D*> mom_min_scan_;
+   vector<TH2D*> mom_max_scan_;
+
+   // Other scans 
+   vector<TH1D*> thetaY_mom_slices_;
+   vector<TH1D*> Y_mom_slices_;
+   vector<TH1D*> pY_mom_slices_;
+   vector<TH1D*> p_mom_slices_;
+
+   // Slice momentum in 200 MeV up to 3100 MeV
+   int step = 200;//500;//250; // 200;
+   int nSlices = pmax / step;
+
+   for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+      int lo = 0 + i_slice*step; 
+      int hi = step + i_slice*step;
+
+      // Mod 
+      TH2D *h_mom_slice = new TH2D(("ThetaY_vs_Time_Modulo_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad]", 87, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//180, -60*boostFactor, 60*boostFactor);
+      mom_slices_.push_back(h_mom_slice);
+
+      TH1D *h_thetaY_mom_slice = new TH1D(("ThetaY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";#theta_{y} [mrad];Tracks",  500, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//180, -60*boostFactor, 60*boostFactor);
+      thetaY_mom_slices_.push_back(h_thetaY_mom_slice);
+
+      TH1D *h_Y_mom_slice = new TH1D(("Y_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Vertical decay position [mm];Tracks",  180, -60, 60);//*boostFactor, 60*boostFactor);
+      Y_mom_slices_.push_back(h_Y_mom_slice);
+
+      TH1D *h_pY_mom_slices = new TH1D(("MomentumY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Track momentum Y MeV];Tracks",  1000, -60, 60);//500, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//40, -70, 70);
+      pY_mom_slices_.push_back(h_pY_mom_slices);
+
+      TH1D *h_p_mom_slices = new TH1D(("Momentum_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Track momentum MeV];Tracks",  int(pmax), 0, pmax);//500, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//40, -70, 70);
+      p_mom_slices_.push_back(h_p_mom_slices);
+
+   }
+
+   // Symmetric cuts
+   for ( int i_slice = 0; i_slice < nSlices/2; i_slice++ ) { 
+
+      int lo = 400 + i_slice*step; 
+      int hi = 3000 - i_slice*step;
+
+      TH2D *h_tmp = new TH2D(("ThetaY_vs_Time_Modulo_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad]", 87, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+      mom_sym_cuts_.push_back(h_tmp);
+
+   }
+
+
+
+    // Pmin scan
+    for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+      int lo = 0 + i_slice*step;
+      int hi = pmax;
+
+      TH2D *h_tmp = new TH2D(("ThetaY_vs_Time_Modulo_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad]", 87, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+      mom_min_scan_.push_back(h_tmp);
+
+    } 
+
+    // pmax scan
+    for ( int i_slice = 0; i_slice < (nSlices-(600/step)); i_slice++ ) { 
+
+      int lo = 600;// 0 + i_slice*step;
+      int hi = 3000 - i_slice*step;
+
+      TH2D *h_tmp = new TH2D(("ThetaY_vs_Time_Modulo_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad]", 87, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+      mom_max_scan_.push_back(h_tmp);
+
+    } 
+   // ==================================================
+//   int slice_count[nSlices];// = 0;
+//   int sym_count[nSlices/2];// = 0;
+//   int pmin_count[nSlices];// = 0;
+//
+//   for (int i_slice = 0; i_slice < nSlices; i_slice++) { 
+//      slice_count[i_slice] = 0;
+//      pmin_count[i_slice] = 0;
+//      if(i_slice < nSlices/2) sym_count[i_slice] = 0;
+//   }
+
+   //int maxBinEntries = 10204; // 500e3 total / 49 files;
+
+   // Get branches (using header file)
+   InitBranches br(tree);
+
+   double targetPerc = 0;
+   int64_t nEntries = tree->GetEntries();
+
+   double muAngleMax = 0;
+   
+   for(int64_t entry = 0; entry < nEntries; entry++) {
+
+      tree->GetEntry(entry);
+
+      if(100*float(entry) / nEntries > targetPerc) {
+         cout << Form("Processed %.1f%%", 100*float(entry)/nEntries) << endl;
+         targetPerc += 10;
+      }
+
+      // Get max muon angle
+      if(br.muDecayPolY > muAngleMax) muAngleMax = br.muDecayPolY;
+
+      // Get variables
+      double time = br.posiInitTime * 1e-3; // us
+
+      // Positron world momentum 
+      TVector3 eMom(br.posiInitPX, br.posiInitPY, br.posiInitPZ); 
+      TVector3 ePos(br.posiInitPosX, br.posiInitPosY, br.posiInitPosZ);
+      TVector3 muPol(br.muDecayPolX, br.muDecayPolY, br.muDecayPolZ);
+
+      double p_world = br.posiInitP;// sqrt(pow(px,2)+pow(py,2)+pow(pz,2));//br.posiInitP; // MeV
+
+      // Vertcial decay angle 
+      // double theta_y = asin(eMom.Y() / p_world)  * 1e3; // mrad 
+      //double theta_y = atan2(eMom.Y(), sqrt(pow(eMom.X(),2)+pow(eMom.Z(),2)))  * 1e3; // mrad 
+
+      //double theta_y = asin(muPol.Y() / muPol.Mag()) * 1e3;
+
+      double g2ModTime = ModTime(time);
+      double y = ePos.Y(); // br.posiInitPosY;
+
+      // RingAngle is angle from x axis, from 0 to 2pi
+      double ringAngle = atan2(br.posiInitPosZ, br.posiInitPosX);    
+      if (ringAngle < 0) ringAngle += TMath::TwoPi();
+
+      // Positron angle around the ring momentum AAR
+      // Z is tangential to magic mom at x and z of decay (Figure 2 of Debevec note)
+      if(AAR) { 
+
+         eMom.RotateY(ringAngle);
+         ePos.RotateY(ringAngle);
+         muPol.RotateY(ringAngle);
+
+         //rotation not perfect, so if original y component was 0 force that to be the case:
+         if (fabs(muPol.y()) < 1E-10){
+            muPol = TVector3(muPol.x(), 0.0, muPol.z());
+            muPol = muPol.Unit();
+         }
+
+         //theta_y = asin(eMom.Y() / eMom.Mag())  * 1e3; // mrad
+         //theta_y = asin(muPol.Y() / muPol.Mag()) * 1e3;
+         //theta_y = atan2(eMom.Y() , eMom.Z()) * 1e3;
+         //theta_y = atan2(eMom.Y(), sqrt(pow(eMom.X(),2)+pow(eMom.Z(),2)))  * 1e3; // mrad 
+
+         //theta_y = (eMom.Y() / eMom.Mag()) * 1e3;
+         //theta_y = (eMom.Y() / eMom.Z()) * 1e3;
+
+         // theta_y = atan2(py, sqrt(pow(px,2) + pow(pz,2))) * 1e3;
+
+      } 
+      // Muon rest frame
+      if(MRF) {
+
+         // Rotate into AAR
+         eMom.RotateY(ringAngle);
+         ePos.RotateY(ringAngle);
+         muPol.RotateY(ringAngle);
+
+         //rotation not perfect, so if original y component was 0 force that to be the case:
+         if (fabs(muPol.y()) < 1E-10){
+            muPol = TVector3(muPol.x(), 0.0, muPol.z());
+            muPol = muPol.Unit();
+         }
+
+         double muP = br.muDecayP;
+         double eP = br.posiInitP;
+         double muE_lab = sqrt(mMu*mMu + muP*muP);
+         double posiE_lab = sqrt(eMass*eMass + eP*eP);
+         double gamma = sqrt(1.0 + pow( muP/mMu, 2 )); 
+
+         // Construct muon momentum vector and rotate it
+         TVector3 muMom(br.muDecayPX, br.muDecayPY, br.muDecayPZ);
+         muMom.RotateY(ringAngle);
+
+         // Construct 4-vector and boost it into the rest frame
+         ROOT::Math::PxPyPzEVector muMomE_lab(muMom.x(), muMom.y(), muMom.z(), muE_lab);
+         ROOT::Math::XYZVector boost = muMomE_lab.BoostToCM();
+
+         // Get boost vector as a lorentz vector
+         TVector3 boostToCM(boost.x(), boost.y(), boost.z());
+
+         // Make positron momentum 4 vector in lab, and get boost vector as a TVector3 vector
+         TLorentzVector posiMomE_lab(eMom.x(), eMom.y(), eMom.z(), posiE_lab);
+
+         // Apply boost to positron lab vector to get it in MRF 1, using TLorentzVectors. Convert to normal TVector3 at end 
+         TLorentzVector posiMomE_MRF = posiMomE_lab;
+         posiMomE_MRF.Boost(boostToCM);
+
+         TVector3 posiMom_MRF(posiMomE_MRF.Px(), posiMomE_MRF.Py(), posiMomE_MRF.Pz());
+
+         eMom = posiMom_MRF; 
+
+         //theta_y = asin(eMom.Y()/eMom.Mag()) * 1e3; // mrad
+
+
+      } 
+
+      // One definition of the vertical angle is the atan of the tranverse momentum over the longitidunal momentum 
+      // Sossong pg 105
+
+      //double p_z = eMom.Z();
+
+      //double p_T = sqrt(pow(eMom.X(),2)+pow(eMom.Y(),2));
+
+      TVector3 p_z(0., 0, eMom.Z());
+      p_z.RotateY(TMath::Pi());
+      
+      TVector3 p_T(eMom.X(), eMom.Y(), 0.);
+
+
+
+      //p_T.RotateY(TMath::Pi()/2);
+
+      double theta_y = p_z.Angle(p_T) * 1e3;// asin(p_T.Mag() / p_z) * 1e3;
+
+      //if(p_T.X() )
+
+      cout<<theta_y<<endl;
+
+
+      // Define the angle between the momentum z component and momentum
+
+      double theta = asin(eMom.Z() / eMom.Mag());
+
+      // Get the projection of the boosted vertcial angle onto the xy plane
+      double phi = asin(eMom.Y() / (eMom.Mag()*sin(theta)) );// * 1e3;
+
+      //double theta_y = phi * 1e3;//asin(eMom.Y() / eMom.Mag()) ;
+
+      //theta_y = atan2(eMom.Y(), eMom.X()) * 1e3;
+
+      //cout<<theta_y<<", "<<phi<<endl;
+
+      // Define this as the vertical angle
+      //asin(eMom.Y(phi * 1e3;//atan2(eMom.Y(), sqrt(pow(eMom.X(),2)+pow(eMom.Z(),2)))  * 1e3; // mrad 
+
+      //cout<<"theta_y\t"<<theta_y<<endl;
+      //double theta_y = atan2(eMom.Y(), sqrt(pow(eMom.X(),2)+pow(eMom.Z(),2)))  * 1e3; // mrad 
+
+
+      //double theta_y = asin(py/eMom.Mag()) * 1e3;  // rad
+
+      decayZ_vs_decayX->Fill(ePos.X(), ePos.Z());
+
+      // Time cuts
+      if(quality && (time < 30 || time > 300)) continue; 
+ 
+      // g-2 cuts. See Fienberg thesis figure 2.10
+      if(p_world > 1900 && p_world < pmax) {
+         wiggle->Fill(time);
+         wiggle_mod->Fill(g2ModTime);
+      } //else if(!quality) {
+         //wiggle->Fill(time);
+        // wiggle_mod->Fill(g2ModTime);
+      //}
+
+      double px = eMom.X();
+      double py = eMom.Y();
+      double pz = eMom.Z();
+
+      momY->Fill(py);
+      momX->Fill(px);
+      momZ->Fill(pz);
+
+      // EDM cuts
+      if(quality && (p_world > 700 && p_world < 2400)) { 
+
+         momentum->Fill(p_world);
+         thetaY->Fill(theta_y);
+         thetaY_vs_time->Fill(time, theta_y);
+         thetaY_vs_time_mod->Fill(g2ModTime, theta_y);
+
+      } else if(!quality) { 
+
+         momentum->Fill(p_world);
+         thetaY->Fill(theta_y);
+         thetaY_vs_time->Fill(time, theta_y);
+         thetaY_vs_time_mod->Fill(g2ModTime, theta_y);
+
+      }
+
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+         int lo = 0 + i_slice*step; 
+         int hi = step + i_slice*step;
+
+         if(p_world >= double(lo) && p_world < double(hi)) {//} && slice_count[i_slice]<maxBinEntries) {
+
+            mom_slices_.at(i_slice)->Fill(g2ModTime, theta_y);
+
+            // Other scans 
+            thetaY_mom_slices_.at(i_slice)->Fill(theta_y);
+            Y_mom_slices_.at(i_slice)->Fill(y);
+            pY_mom_slices_.at(i_slice)->Fill(py);
+            p_mom_slices_.at(i_slice)->Fill(p_world);
+
+            //slice_count[i_slice]++;  
+         }
+
+         lo = 400 + i_slice*step; 
+         hi = 3000 - i_slice*step;
+
+         if(p_world >= double(lo) && p_world < double(hi) && i_slice < nSlices/2) {//} && sym_count[i_slice]<maxBinEntries) {
+            mom_sym_cuts_.at(i_slice)->Fill(g2ModTime, theta_y);
+            //sym_count[i_slice]++;
+         }
+         
+
+         lo = 0 + i_slice*step;
+         hi = pmax;
+
+         if(p_world >= double(lo) && p_world < double(hi)) {//&& pmin_count[i_slice]<maxBinEntries) {
+            mom_min_scan_.at(i_slice)->Fill(g2ModTime, theta_y);
+            //pmin_count[i_slice]++;
+         }
+
+         lo = 600;
+         hi = 3000 - i_slice*step;
+
+         if(p_world >= double(lo) && p_world < double(hi) && i_slice < (nSlices - (600/step))) {//&& pmin_count[i_slice]<maxBinEntries) {
+            mom_max_scan_.at(i_slice)->Fill(g2ModTime, theta_y);
+            //pmin_count[i_slice]++;
+         }
+
+      }
+         
+
+   }
+
+   // Write to output
+   // Set output directory
+   output->mkdir("MainPlots"); output->cd("MainPlots");
+   momentum->Write();
+   wiggle->Write();
+   wiggle_mod->Write();
+   thetaY->Write();
+   thetaY_vs_time->Write();
+   thetaY_vs_time_mod->Write();
+   decayZ_vs_decayX->Write();
+   //WORLD_decayZ_vs_decayX->Write();
+   momX->Write();
+   momY->Write();
+   momZ->Write();
+
+   output->mkdir("MomSlices"); output->mkdir("MomSymCuts"); output->mkdir("MomMinScan"); output->mkdir("MomMaxScan");
+
+   for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) {
+      output->cd("MomSlices"); 
+      mom_slices_.at(i_slice)->Write();
+      thetaY_mom_slices_.at(i_slice)->Write();
+      Y_mom_slices_.at(i_slice)->Write();
+      pY_mom_slices_.at(i_slice)->Write();
+      p_mom_slices_.at(i_slice)->Write();
+      output->cd("MomSymCuts"); if(i_slice < nSlices/2) mom_sym_cuts_.at(i_slice)->Write();
+      output->cd("MomMinScan"); mom_min_scan_.at(i_slice)->Write();
+      output->cd("MomMaxScan"); if(i_slice < (nSlices - (600/step))) mom_max_scan_.at(i_slice)->Write();
+   }
+
+
+   cout<<"Muon max angle:\t"<<muAngleMax<<" radians"<<endl;
+
+   return;
+
+}
+
+int main(int argc, char *argv[]) {
+
+   bool quality = true;//true;//true;//false;
+
+   string inFileName = argv[1]; // "/pnfs/GM2/persistent/EDM/MC/dMu/TruthNTup/truthTrees.000.root";//
+   string outFileName = argv[2]; //"tmp.root";
+
+   //string treeName = "trackerPhaseAnalyzer/g2phase";
+   string treeName = "phaseAnalyzer/g2phase";
+   // Open tree and load branches
+   TFile *fin = TFile::Open(inFileName .c_str());
+   // Get tree
+   TTree *tree = (TTree*)fin->Get(treeName.c_str());
+
+   cout<<"\nOpened tree:\t"<<treeName<<" "<<tree<<" from file "<<inFileName<<" "<<fin<<endl;
+
+   // Book output
+
+   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
+   
+   // Fill histograms
+   Run(tree, fout, quality);
+
+   // Close
+   fout->Close();
+   fin->Close();
+
+   cout<<"\nDone. Histogram written to:\t"<<outFileName<<" "<<fout<<endl;
+   
+   return 0;
+}
