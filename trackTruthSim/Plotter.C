@@ -61,7 +61,22 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-void Run(TTree *tree, TFile *output, bool quality, bool truth) {
+void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffsetCorrection = true) {
+
+  // Get correction histogram
+  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_";
+
+  // Just one set of files for now.
+  if(truth) verticalOffsetCorrectionFileName += "trackTruth_WORLD_250MeV_BQ.root";
+  else verticalOffsetCorrectionFileName += "trackReco_WORLD_250MeV_BQ.root";
+
+  TFile *verticalOffsetCorrectionFile = TFile::Open(verticalOffsetCorrectionFileName);
+
+  cout<<"Got vertical offset correction file "<<verticalOffsetCorrectionFileName<<", "<<verticalOffsetCorrectionFile<<endl;
+
+  // Book holder for vertical offset histograms 
+  vector<TH1D*> verticalOffsetHists_;
+
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -110,6 +125,9 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
   int nSlices = pmax/step;
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
+
+    TH1D *verticalOffsetHist = (TH1D*)verticalOffsetCorrectionFile->Get(("VerticalOffsetHists/"+stns[i_stn]+"_ThetaY_vs_p").c_str());
+    verticalOffsetHists_.push_back(verticalOffsetHist);
 
     momentum_[i_stn] = new TH1D((stns[i_stn]+"_Momentum").c_str(), ";Track momentum [MeV];Tracks", int(pmax), 0, pmax); 
     momY_[i_stn] = new TH1D((stns[i_stn]+"_MomentumY").c_str(), ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
@@ -218,7 +236,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
       if (time < g2Period*7 || time > g2Period*70) continue; 
 
       // Should include hit vol and pval cuts
-      // if (!vertexQual) continue;
+      if (!vertexQual) continue;
 
     }
 
@@ -254,6 +272,14 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
     else if(stn==12) stn_id = 3;
     else if(stn==18) stn_id = 4;
     else cerr<<"Station "<<stn<<" not recognised";
+
+    // Correct offset
+    if(verticalOffsetCorrection) {
+
+      double theta_y_offset = verticalOffsetHists_.at(stn_id)->GetBinContent(verticalOffsetHists_.at(stn_id)->FindBin(p));
+      theta_y = theta_y - theta_y_offset;
+
+    }
 
     decayZ_vs_decayX_[stn_id]->Fill(x, z);
 
@@ -336,6 +362,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
       cout << Form("Processed %.1f%%", 100*float(entry)/nEntries) << endl;
       targetPerc += 10;
     }
+
 
   }
 
@@ -459,6 +486,8 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
 
   cout<<"Written plots."<<endl;
 
+  verticalOffsetCorrectionFile->Close();
+
   return;
 
 }
@@ -466,7 +495,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
 int main(int argc, char *argv[]) {
 
   bool quality = true;
-  bool truth = false;
+  bool truth = true;
 
   string inFileName = argv[1]; 
   string outFileName = argv[2];

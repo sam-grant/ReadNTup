@@ -6,11 +6,11 @@ echo "Dataset ${dataset}"
 echo "Input ${input}"
 echo "Output ${output}"
 
-./Plotter.exe $input $output $dataset
+# ./Plotter.exe $input $output $dataset
 
 ##########################################################
 # Uncomment if re-submitting and you don't want to overwrite 
-# if [[ ! -f $output ]]; then
-#  	./Plotter.exe $input $output $dataset
-# fi
+if [[ ! -f $output ]]; then
+ 	./Plotter.exe $input $output $dataset
+fi
 ##########################################################

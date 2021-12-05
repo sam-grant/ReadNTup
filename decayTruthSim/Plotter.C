@@ -62,7 +62,14 @@ double RandomisedTime(TRandom3 *rand, double time) {
 }
 
 
-void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false) {
+void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bool verticalOffsetCorrection = true) {
+
+  // Get correction histogram
+  //TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecays_WORLD_250MeV_AQ.root";
+  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecaysControl_WORLD_250MeV_AQ.root";
+  //TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_allDecays_WORLD_250MeV_AQ.root";
+  TFile *verticalOffsetCorrectionFile = TFile::Open(verticalOffsetCorrectionFileName);
+  TH1D* verticalOffsetHist = (TH1D*)verticalOffsetCorrectionFile->Get("VerticalOffsetHists/ThetaY_vs_p");
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -258,6 +265,15 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false) {
 
     // convert into mrad (always forget to do this so I'm putting it here)
     theta_y = theta_y * 1e3;
+
+    // Correct offset
+    if(verticalOffsetCorrection) {
+
+      double theta_y_offset = verticalOffsetHist->GetBinContent(verticalOffsetHist->FindBin(p));
+      theta_y = theta_y - theta_y_offset;
+
+    }
+
 
     // Time cuts
     if(quality && (time < g2Period*7 || time > g2Period*70)) continue; 

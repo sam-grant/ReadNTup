@@ -61,7 +61,13 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-void Run(TTree *tree, TFile *output, bool quality) {
+void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection = true) {
+
+  // Get correction histogram
+  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_trackRecoControl_WORLD_250MeV_CQ.root";
+  TFile *verticalOffsetCorrectionFile = TFile::Open(verticalOffsetCorrectionFileName);
+  // Book holder for vertical offset histograms 
+  vector<TH1D*> verticalOffsetHists_;
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -110,6 +116,9 @@ void Run(TTree *tree, TFile *output, bool quality) {
   int nSlices = pmax/step;
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
+
+    TH1D *verticalOffsetHist = (TH1D*)verticalOffsetCorrectionFile->Get(("VerticalOffsetHists/"+stns[i_stn]+"_ThetaY_vs_p").c_str());
+    verticalOffsetHists_.push_back(verticalOffsetHist);
 
     momentum_[i_stn] = new TH1D((stns[i_stn]+"_Momentum").c_str(), ";Track momentum [MeV];Tracks", int(pmax), 0, pmax); 
     momY_[i_stn] = new TH1D((stns[i_stn]+"_MomentumY").c_str(), ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
@@ -203,7 +212,7 @@ void Run(TTree *tree, TFile *output, bool quality) {
 
       if (time < g2Period*7 || time > g2Period*70) continue; 
 
-      //if(nHits < 12) continue;
+      if(nHits < 12) continue;
 
       // Should include hit vol and pval cuts
       // if (!vertexQual) continue;
@@ -242,6 +251,14 @@ void Run(TTree *tree, TFile *output, bool quality) {
     else if(stn==12) stn_id = 3;
     else if(stn==18) stn_id = 4;
     else cerr<<"Station "<<stn<<" not recognised";
+
+    // Correct offset
+    if(verticalOffsetCorrection) {
+
+      double theta_y_offset = verticalOffsetHists_.at(stn_id)->GetBinContent(verticalOffsetHists_.at(stn_id)->FindBin(p));
+      theta_y = theta_y - theta_y_offset;
+
+    }
 
     decayZ_vs_decayX_[stn_id]->Fill(x, z);
 

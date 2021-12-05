@@ -1,3 +1,5 @@
+# DO NOT USE IT FAILS TO INCLUDE THE PART.1. INTERMEDIATE FILES FOR SOME REASON
+
 dataset=$1
 nCores=$2
 
@@ -32,6 +34,6 @@ for file in `ls plots_${dataset}.*.root`; do
   	files=$files" "$file
 done
 
-hadd.sh plots_${dataset}.root $files
+hadd -f plots_${dataset}.root $files
 
 # hadd trackTruthTrees.3.root splitFileList0*/*.root

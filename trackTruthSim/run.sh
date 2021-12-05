@@ -24,6 +24,7 @@ for tree in `ls $dir | sort -V`; do
     id=${tree##*truthTrees.}
     id=${id%%.root*}
     ./Plotter.exe ${dir}/${tree} ${config}/plots_${id}.root
+    # break
 
 done
 

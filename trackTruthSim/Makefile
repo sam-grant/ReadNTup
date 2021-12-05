@@ -3,7 +3,7 @@ C++ = g++
 ROOTFLAGS = $(shell root-config --cflags)
 ROOTLIBS  = $(shell root-config --libs)
 
-Target = Plotter.exe
+Target = Plotter.exe 
 
 all:$(Target)
 
