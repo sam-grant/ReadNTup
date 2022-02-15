@@ -61,6 +61,30 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
+bool AcceptedDecayY(double py, double y) { 
+
+  // Vertical
+  if(y >= -50 && y < -40 && py >= -0.49 && py < 66.01) return true;  
+  else if(y >= -40 && y < -30 && py >= -15.19 && py < 69.51) return true;  
+  else if(y >= -30 && y < -20 && py >= -30.03 && py < 68.53) return true; 
+  else if(y >= -20 && y < -10 && py >= -42.21 && py < 63.77) return true; 
+  else if(y >= -10 && y < 0 && py >= -57.19 && py < 60.27) return true; 
+  else if(y >= 0 && y < 10 && py >= -57.47 && py < 49.35) return true; 
+  else if(y >= 10 && y < 20 && py >= -64.89 && py < 39.27) return true; 
+  else if(y >= 20 && y < 30 && py >= -66.43 && py < 28.21) return true; 
+  else if(y >= 30 && y < 40 && py >= -66.57 && py < 15.05) return true; 
+  else if(y >= 40 && y < 50 && py >= -68.39 && py < -0.07) return true; 
+  else return false;
+
+}
+
+bool AcceptedDecayX(double px) { 
+
+  // Radial
+  if(px >= -0.14 && px < 0.14) return true;
+  else return true;
+
+}
 
 void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bool verticalOffsetCorrection = true) {
 
@@ -101,7 +125,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
   TH2D *thetaY_vs_time_mod_long = new TH2D("ThetaY_vs_Time_Modulo_Long", ";Time modulo [#mus]; #theta_{y} [mrad] / 149.2 ns", 29*moduloMultiple, 0, g2Period*moduloMultiple, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time_mod_long_20ns = new TH2D("ThetaY_vs_Time_Modulo_Long_20ns", ";Time modulo [#mus]; #theta_{y} [mrad] / 20 ns", 174*moduloMultiple, 0, g2Period*moduloMultiple, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time_mod_long_50ns = new TH2D("ThetaY_vs_Time_Modulo_Long_50ns", ";Time modulo [#mus]; #theta_{y} [mrad] / 50 ns", 87*moduloMultiple, 0, g2Period*moduloMultiple, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-
+  TH2D *thetaY_vs_momentum = new TH2D("ThetaY_vs_Momentum", ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   // Momentum scans
   vector<TH1D*> thetaY_mom_slices_;
   vector<TH1D*> Y_mom_slices_;
@@ -274,6 +298,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
 
     }
 
+    if(!AcceptedDecayY(py, y)) continue;// || !AcceptedDecayX(px)) continue;
 
     // Time cuts
     if(quality && (time < g2Period*7 || time > g2Period*70)) continue; 
@@ -301,6 +326,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
       thetaY_vs_time_50ns->Fill(time, theta_y);
       thetaY_vs_time_mod->Fill(g2ModTime, theta_y);
       thetaY_vs_time_mod_50ns->Fill(g2ModTime, theta_y);
+      thetaY_vs_momentum->Fill(p, theta_y);
 
       if(time > 8*g2Period) {
         thetaY_vs_time_mod_long->Fill(longModTime, theta_y);
@@ -317,6 +343,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
       thetaY_vs_time_50ns->Fill(time, theta_y);
       thetaY_vs_time_mod->Fill(g2ModTime, theta_y);
       thetaY_vs_time_mod_50ns->Fill(g2ModTime, theta_y);
+      thetaY_vs_momentum->Fill(p, theta_y);
 
       if(time > 8*g2Period) {
         thetaY_vs_time_mod_long->Fill(longModTime, theta_y);
@@ -379,6 +406,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
   wiggle_mod_long->Write();
   thetaY->Write();
   thetaY_vs_time->Write();
+  thetaY_vs_momentum->Write();
   thetaY_vs_time_20ns->Write(); 
   thetaY_vs_time_50ns->Write(); 
   thetaY_vs_time_mod->Write();
@@ -416,7 +444,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
 int main(int argc, char *argv[]) {
 
   bool boost = false;
-  bool quality = true;//true;//true;//false;
+  bool quality = false; 
 
   string inFileName = argv[1]; // "/pnfs/GM2/persistent/EDM/MC/dMu/TruthNTup/truthTrees.000.root";//
   string outFileName = argv[2]; //"tmp.root";

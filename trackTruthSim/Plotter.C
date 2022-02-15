@@ -61,7 +61,16 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffsetCorrection = true) {
+double ReweightedAngle(TRandom3 *rand, double theta_y) {
+
+  double weighting = 0.917213608; 
+  double weighting_err = 0.008734914;
+  
+  return rand->Gaus(theta_y*weighting, weighting_err);
+
+}
+
+void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffsetCorrection = true, bool reweightAngle = true) {
 
   // Get correction histogram
   TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_";
@@ -121,7 +130,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
   vector<TH2D*> thetaY_vs_time_mod_long_50ns_slices_[n_stn];
 
   // Slice momentum
-  int step = 250; 
+  int step = 250;//250; 
   int nSlices = pmax/step;
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
@@ -195,8 +204,6 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
   int64_t nEntries = tree->GetEntries();
 
   double muAngleMax = 0;
-
-  int64_t counter = 0;
   
   // For FR randomisation
   TRandom3 *rand = new TRandom3(12345);
@@ -259,10 +266,16 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
 
     double p = eMom.Mag();
 
-    // If the you have the vertex cut switched on, py must be negative
     double theta_y = asin(py/p);
 
+/*    double pxz = sqrt(pow(px,2)+pow(pz,2));
+    double theta_y_2 = atan(py/pxz);
+    cout<<theta_y<<", "<<theta_y_2<<endl;*/
+
     theta_y = theta_y * 1e3;
+
+    // Reweight angle to more closely resemble data
+    //if(reweightAngle) theta_y = ReweightedAngle(rand, theta_y);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -495,11 +508,13 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
 int main(int argc, char *argv[]) {
 
   bool quality = true;
-  bool truth = true;
+  bool truth = false;
+  bool reweightAngle = false;
 
   string inFileName = argv[1]; 
   string outFileName = argv[2];
 
+  cout<<inFileName<<endl;
   string treeName = "trackerNTup/TrackerMCDecayTree";
 
   // Open tree and load branches
@@ -514,7 +529,7 @@ int main(int argc, char *argv[]) {
   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
    
   // Fill histograms
-  Run(tree, fout, quality, truth);
+  Run(tree, fout, quality, truth, reweightAngle);
 
   // Close
   fout->Close();

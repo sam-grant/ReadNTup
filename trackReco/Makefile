@@ -3,7 +3,7 @@ C++ = g++
 ROOTFLAGS = $(shell root-config --cflags)
 ROOTLIBS  = $(shell root-config --libs)
 
-Target = Plotter.exe FastRotation.exe VerticalOffset.exe OrthogonalPlotter.exe test.exe
+Target = Plotter.exe FastRotation.exe VerticalOffset.exe OrthogonalPlotter.exe test.exe MomentumDist.exe
 
 all:$(Target)
 
@@ -21,6 +21,9 @@ OrthogonalPlotter.exe: OrthogonalPlotter.C
 
 test.exe: test.C
 	${C++} -o $@ test.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
+
+MomentumDist.exe: MomentumDist.C
+	${C++} -o $@ MomentumDist.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
 
 
 clean:

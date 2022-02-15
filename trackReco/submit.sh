@@ -22,8 +22,8 @@ if [ ! -d ${datasetName} ]; then
 
 ##########################################################
 # Comment if re-submitting and you don't want to overwrite 
-# else 
-#  rm -f ${datasetName}/*.root
+else 
+ rm -f ${datasetName}/*.root
 ##########################################################
 
 fi

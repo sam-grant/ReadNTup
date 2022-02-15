@@ -198,7 +198,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection
 
     double time = br.decayTime * 1e-3; // us
     double x = br.decayVertexPosX; double y = br.decayVertexPosY; double z = br.decayVertexPosZ;
-    double px = br.decayVertexMomX; double py = br.decayVertexMomY; double pz = br.decayVertexMomZ; 
+    double px = br.decayVertexMomX; double py = -br.decayVertexMomY; double pz = br.decayVertexMomZ; 
 
     time = RandomisedTime(rand, time); // randomise out the FR
 
@@ -215,7 +215,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection
       if(nHits < 12) continue;
 
       // Should include hit vol and pval cuts
-      // if (!vertexQual) continue;
+      if (!vertexQual) continue;
 
     }
 
