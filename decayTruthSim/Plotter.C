@@ -61,39 +61,71 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-bool AcceptedDecayY(double py, double y) { 
+double AcceptanceWeightedAngle(TH2D *map, double theta_y, double y) { 
 
-  // Vertical
-  if(y >= -50 && y < -40 && py >= -0.49 && py < 66.01) return true;  
-  else if(y >= -40 && y < -30 && py >= -15.19 && py < 69.51) return true;  
-  else if(y >= -30 && y < -20 && py >= -30.03 && py < 68.53) return true; 
-  else if(y >= -20 && y < -10 && py >= -42.21 && py < 63.77) return true; 
-  else if(y >= -10 && y < 0 && py >= -57.19 && py < 60.27) return true; 
-  else if(y >= 0 && y < 10 && py >= -57.47 && py < 49.35) return true; 
-  else if(y >= 10 && y < 20 && py >= -64.89 && py < 39.27) return true; 
-  else if(y >= 20 && y < 30 && py >= -66.43 && py < 28.21) return true; 
-  else if(y >= 30 && y < 40 && py >= -66.57 && py < 15.05) return true; 
-  else if(y >= 40 && y < 50 && py >= -68.39 && py < -0.07) return true; 
-  else return false;
+  int i = map->GetXaxis()->FindBin(y);
+  int j = map->GetYaxis()->FindBin(theta_y);
+
+  double weighting = map->GetBinContent(i, j);
+
+  //cout<<"weighting: "<<weighting<<endl;
+
+  return theta_y * weighting;
+
 
 }
 
-bool AcceptedDecayX(double px) { 
+double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double theta_y, double y) { 
 
-  // Radial
-  if(px >= -0.14 && px < 0.14) return true;
-  else return true;
+  // Get coordinates
+  int i = map1->GetXaxis()->FindBin(y);
+  int j = map1->GetYaxis()->FindBin(theta_y);
+
+  // Get main weighting
+  double weighting1 = map1->GetBinContent(i, j);
+
+  if(isnan(weighting1)) return theta_y;
+
+  // For min/max momentum 
+  if(map2==0) return theta_y * weighting1;
+
+  // Get secondary weighting 
+
+    // Get coordinates
+  int i2 = map2->GetXaxis()->FindBin(y);
+  int j2 = map2->GetYaxis()->FindBin(theta_y);
+
+  double weighting2 = map2->GetBinContent(i2, j2);
+
+  // Interpolate
+  double weighting = (weighting1 + weighting2)/2;
+
+  if(isnan(weighting)) return theta_y;
+
+  //cout<<theta_y * weighting<<endl;
+  //cout<<weighting<<endl;
+
+  return theta_y * weighting;
+
 
 }
 
-void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bool verticalOffsetCorrection = true) {
+void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bool verticalOffsetCorrection = true, bool acceptanceCorr = true) {
 
   // Get correction histogram
   //TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecays_WORLD_250MeV_AQ.root";
-  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecaysControl_WORLD_250MeV_AQ.root";
   //TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_allDecays_WORLD_250MeV_AQ.root";
+
+  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecaysControl_WORLD_250MeV_AQ.root";
   TFile *verticalOffsetCorrectionFile = TFile::Open(verticalOffsetCorrectionFileName);
+
   TH1D* verticalOffsetHist = (TH1D*)verticalOffsetCorrectionFile->Get("VerticalOffsetHists/ThetaY_vs_p");
+
+  TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.root";
+  TFile *acceptanceFile = TFile::Open(acceptanceFileName);
+  // TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get("InverseAcceptanceWeighting/AllMom/WeightMap");
+
+ // cout<<"Got acceptance map for all momentum: "<<acceptanceHist<<endl;
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -179,6 +211,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     thetaY_mom_slices_.push_back(h_thetaY_mom_slice);
 
   }
+
 
   // Get branches (using header file)
   InitBranches br(tree);
@@ -297,9 +330,73 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
       theta_y = theta_y - theta_y_offset;
 
     }
+    
+    // Apply momentum dependant acceptance weighting
+    //cout<<"\ntheta_y "<<theta_y<<endl;
+    if(acceptanceCorr) {
 
-    if(!AcceptedDecayY(py, y)) continue;// || !AcceptedDecayX(px)) continue;
 
+
+
+      //double new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+      //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+
+      //TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get("InverseAcceptanceWeighting/AllMom/WeightMap");
+
+      //cout<<"\n ---> theta_y = "<<theta_y<<endl;
+
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+        int lo = 0 + i_slice*step; 
+        int hi = step + i_slice*step;
+
+        // Linear interpolation 
+
+        // What is the nearest bin centre?
+        if(p >= double(lo) && p < double(hi)) { 
+
+          TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo)+"_"+to_string(hi)).c_str());
+
+          double binCentre = (lo+hi)/2;
+          double new_theta_y = 0; 
+          //new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+          //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+          if(p<binCentre) { // Get next lowest bin 
+
+            TH2D *acceptanceHistLo = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo-step)+"_"+to_string(hi-step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistLo, theta_y, y);
+          
+            //cout<<"---> LO: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+
+          } else if(p>=binCentre) { // Get next highest bin 
+
+            TH2D *acceptanceHistHi = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo+step)+"_"+to_string(hi+step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistHi, theta_y, y);
+
+            //cout<<"---> HI: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          }
+
+
+          if(!isnan(new_theta_y)) {
+
+            theta_y = new_theta_y;
+
+            //cout<<"---> RESULT:\nnew theta_y = "<<new_theta_y<<endl;
+        
+          } 
+
+        }
+
+      }
+
+    }
+    //cout<<"theta_y "<<theta_y<<endl;
+    //cout<<"theta_y = "<<theta_y<<endl;
     // Time cuts
     if(quality && (time < g2Period*7 || time > g2Period*70)) continue; 
 
@@ -436,6 +533,9 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     p_mom_slices_.at(i_slice)->Write();
       
   }
+
+  verticalOffsetCorrectionFile->Close();
+  acceptanceFile->Close();
 
   return;
 
