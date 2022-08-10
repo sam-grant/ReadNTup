@@ -19,8 +19,8 @@
 
 using namespace std;
 
-double omegaAMagic = 0.00143934; // from gm2geom consts / kHz 
-double g2Period = (2*TMath::Pi()/omegaAMagic) * 1e-3; // 4.3653239 us
+double omega_a = 1.439311;// (average for mu+ at BNL) 0.00143934*1e3;//1.439311; // rad/us 0.00143934; // kHz from gm2const, it's an angular frequency though...
+double g2Period = TMath::TwoPi() / omega_a;//s * 1e-3; // us
 double mMu = 105.6583715; // MeV
 double aMu = 11659208.9e-10; 
 double gmagic = std::sqrt( 1.+1./aMu );
@@ -28,8 +28,8 @@ double pmax = 1.01 * mMu * gmagic;
 double eMass = 0.510999;
 double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
-double pLo = 750; 
-double pHi = 2750;
+double pLo = 1000; 
+double pHi = 2500;
 
 TTree *InitTree(string fileName, string treeName) { 
 
@@ -70,7 +70,47 @@ double ReweightedAngle(TRandom3 *rand, double theta_y) {
 
 }
 
-void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffsetCorrection = true, bool reweightAngle = true) {
+double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double theta_y, double y) { 
+
+  // Get coordinates
+  int i = map1->GetXaxis()->FindBin(y);
+  int j = map1->GetYaxis()->FindBin(theta_y);
+
+  // Get main weighting
+  double weighting1 = map1->GetBinContent(i, j);
+  //double err_weighting1 = map1->GetBinError(i, j);
+
+  if(isnan(weighting1)) return theta_y;
+
+  // For min/max momentum 
+  if(map2==0) return theta_y * (1/weighting1);
+
+  // Get secondary weighting 
+
+    // Get coordinates
+  int i2 = map2->GetXaxis()->FindBin(y);
+  int j2 = map2->GetYaxis()->FindBin(theta_y);
+
+  double weighting2 = map2->GetBinContent(i2, j2);
+
+  // Interpolate
+  double weighting = (weighting1 + weighting2)/2;
+
+  if(isnan(weighting)) {
+    //cout<<"WARNING: acceptance wieghting is nan"<<endl;
+    return theta_y;
+  }
+
+  //cout<<theta_y * weighting<<endl;
+  //cout<<weighting<<endl;
+
+  return theta_y * (1/weighting);
+
+
+}
+
+void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, bool truth, bool reweightAngle, bool verticalOffsetCorrection, bool acceptanceCorrection) {
+
 
   // Get correction histogram
   TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_";
@@ -86,6 +126,10 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
   // Book holder for vertical offset histograms 
   vector<TH1D*> verticalOffsetHists_;
 
+  // Acceptance correction
+  TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.truth.root";
+  TFile *acceptanceFile = TFile::Open(acceptanceFileName);
+
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -100,7 +144,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
   TH1D *momY_[n_stn];
   TH1D *momX_[n_stn];
   TH1D *momZ_[n_stn];
-  TH2D *decayZ_vs_decayX_[n_stn];
+  TH2D *decayX_vs_decayZ_[n_stn];
   TH1D *wiggle_[n_stn];
   TH1D *wiggle_mod_[n_stn];
   TH1D *wiggle_mod_long_[n_stn];
@@ -142,7 +186,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
     momY_[i_stn] = new TH1D((stns[i_stn]+"_MomentumY").c_str(), ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
     momX_[i_stn] = new TH1D((stns[i_stn]+"_MomentumX").c_str(), ";Track momentum X [MeV];Tracks", int(pmax), -pmax, pmax); 
     momZ_[i_stn] = new TH1D((stns[i_stn]+"_MomentumZ").c_str(), ";Track momentum Z [MeV];Tracks", int(pmax), -pmax, pmax); 
-    decayZ_vs_decayX_[i_stn] = new TH2D((stns[i_stn]+"_DecayZ_vs_DecayX").c_str(), ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
+    decayX_vs_decayZ_[i_stn] = new TH2D((stns[i_stn]+"_DecayX_vs_DecayZ").c_str(), ";Decay vertex position Z [mm];Decay vertex position X [mm]", 800, -8000, 8000, 800, -8000, 8000);
     wiggle_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle").c_str(), ";Decay time [#mus];Tracks", 2700, 0, 2700*T_c);
     wiggle_mod_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo").c_str(), ";t_{g#minus2}^{mod} [#mus];Tracks / 149.2 ns", 29, 0, g2Period); 
     wiggle_mod_long_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo_Long").c_str(), ";Time modulo [#mus];Tracks / 149.2 ns", 41*moduloMultiple, 0, g2Period*moduloMultiple); 
@@ -166,7 +210,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
       TH1D *h_p_mom_slices = new TH1D((stns[i_stn]+"_Momentum_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Track momentum [MeV];Tracks",  int(pmax), 0, pmax);
       p_mom_slices_[i_stn].push_back(h_p_mom_slices);
 
-      TH1D *h_pY_mom_slices = new TH1D((stns[i_stn]+"_MomentumY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Track momentum Y MeV];Tracks",  1000, -60, 60);
+      TH1D *h_pY_mom_slices = new TH1D((stns[i_stn]+"_MomentumY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Track momentum Y [MeV];Tracks",  1000, -60, 60);
       pY_mom_slices_[i_stn].push_back(h_pY_mom_slices);
 
       TH1D *h_Y_mom_slice = new TH1D((stns[i_stn]+"_Y_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Vertical decay position [mm];Tracks",  180, -60, 60);
@@ -236,14 +280,14 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
     bool hitVol = br.hitVolume;
     double pVal = br.pValue;
     bool vertexQual = br.passVertexQuality;
-
+   
+    if (timeCuts && time < g2Period*7) continue; 
+    
     // Time cuts
     if (quality) {
-
-      if (time < g2Period*7 || time > g2Period*70) continue; 
-
       // Should include hit vol and pval cuts
       if (!vertexQual) continue;
+      //if(pVal < 0.05) continue;
 
     }
 
@@ -275,8 +319,8 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
     theta_y = theta_y * 1e3;
 
     // Reweight angle to more closely resemble data
-    //if(reweightAngle) theta_y = ReweightedAngle(rand, theta_y);
-
+    if(reweightAngle) theta_y = ReweightedAngle(rand, theta_y);
+    
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Fill stations invidually according the station array
@@ -289,15 +333,64 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
     // Correct offset
     if(verticalOffsetCorrection) {
 
+      // cout<<"\ntheta_y = "<<theta_y<<endl;
+
       double theta_y_offset = verticalOffsetHists_.at(stn_id)->GetBinContent(verticalOffsetHists_.at(stn_id)->FindBin(p));
-      theta_y = theta_y - theta_y_offset;
+      theta_y = theta_y - theta_y_offset; 
+
+      // cout<<"theta_y = "<<theta_y<<endl;
+      
+    }
+
+    if(acceptanceCorrection) {
+
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+        int lo = 0 + i_slice*step; 
+        int hi = step + i_slice*step;
+
+        // Linear interpolation 
+
+        // What is the nearest bin centre?
+        if(p >= double(lo) && p < double(hi)) { 
+
+          TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/S"+to_string(stn)+"_WeightMap_"+to_string(lo)+"_"+to_string(hi)).c_str());
+
+          double binCentre = (lo+hi)/2;
+          double new_theta_y = 0; 
+
+          //new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+          //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+          if(p<binCentre) { // Get next lowest bin 
+
+            TH2D *acceptanceHistLo = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/S"+to_string(stn)+"_WeightMap_"+to_string(lo-step)+"_"+to_string(hi-step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistLo, theta_y, y);
+          
+            //cout<<"---> LO: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          } else if(p>=binCentre) { // Get next highest bin 
+
+            TH2D *acceptanceHistHi = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/S"+to_string(stn)+"_WeightMap_"+to_string(lo+step)+"_"+to_string(hi+step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistHi, theta_y, y);
+
+            //cout<<"---> HI: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          }
+
+          theta_y = new_theta_y;
+
+        }
+
+      }
 
     }
 
-    decayZ_vs_decayX_[stn_id]->Fill(x, z);
+    decayX_vs_decayZ_[stn_id]->Fill(z, x);
 
     // g-2 cuts. See Fienberg thesis figure 2.10
-    if(p > 1900  && p < pmax) {
+    if(p > 1700  && p < pmax) {
       wiggle_[stn_id]->Fill(time);
       wiggle_mod_[stn_id]->Fill(g2ModTime);
       if(time>8*g2Period) wiggle_mod_long_[stn_id]->Fill(longModTime);
@@ -308,7 +401,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
     momZ_[stn_id]->Fill(pz);
 
     // EDM cuts
-    if( quality && p > pLo && p < pHi) { 
+    if( momCuts && p > pLo && p < pHi) { 
 
       momentum_[stn_id]->Fill(p);
       thetaY_[stn_id]->Fill(theta_y);
@@ -324,7 +417,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
         thetaY_vs_time_mod_long_50ns_[stn_id]->Fill(longModTime, theta_y);    
       }  
 
-    } else if(!quality) { 
+    } else if(!momCuts) { 
 
       momentum_[stn_id]->Fill(p);
       thetaY_[stn_id]->Fill(theta_y);
@@ -396,7 +489,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
   thetaY_vs_time_mod_long_[1]->Add(thetaY_vs_time_mod_long_[3], thetaY_vs_time_mod_long_[4]);
   thetaY_vs_time_mod_long_20ns_[1]->Add(thetaY_vs_time_mod_long_20ns_[3], thetaY_vs_time_mod_long_20ns_[4]);
   thetaY_vs_time_mod_long_50ns_[1]->Add(thetaY_vs_time_mod_long_50ns_[3], thetaY_vs_time_mod_long_50ns_[4]);
-  decayZ_vs_decayX_[1]->Add(decayZ_vs_decayX_[3], decayZ_vs_decayX_[4]);
+  decayX_vs_decayZ_[1]->Add(decayX_vs_decayZ_[3], decayX_vs_decayZ_[4]);
   momX_[1]->Add(momX_[3], momX_[4]);
   momY_[1]->Add(momY_[3], momY_[4]);
   momZ_[1]->Add(momZ_[3], momZ_[4]);
@@ -431,7 +524,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
   thetaY_vs_time_mod_long_[0]->Add(thetaY_vs_time_mod_long_[1], thetaY_vs_time_mod_long_[2]);
   thetaY_vs_time_mod_long_20ns_[0]->Add(thetaY_vs_time_mod_long_20ns_[1], thetaY_vs_time_mod_long_20ns_[2]);
   thetaY_vs_time_mod_long_50ns_[0]->Add(thetaY_vs_time_mod_long_50ns_[1], thetaY_vs_time_mod_long_50ns_[2]);
-  decayZ_vs_decayX_[0]->Add(decayZ_vs_decayX_[1], decayZ_vs_decayX_[2]);
+  decayX_vs_decayZ_[0]->Add(decayX_vs_decayZ_[1], decayX_vs_decayZ_[2]);
   momX_[0]->Add(momX_[1], momX_[2]);
   momY_[0]->Add(momY_[1], momY_[2]);
   momZ_[0]->Add(momZ_[1], momZ_[2]);
@@ -473,7 +566,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
     thetaY_vs_time_mod_long_[i_stn]->Write();
     thetaY_vs_time_mod_long_20ns_[i_stn]->Write();
     thetaY_vs_time_mod_long_50ns_[i_stn]->Write();
-    decayZ_vs_decayX_[i_stn]->Write();
+    decayX_vs_decayZ_[i_stn]->Write();
     momX_[i_stn]->Write();
     momY_[i_stn]->Write();
     momZ_[i_stn]->Write();
@@ -508,8 +601,12 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth, bool verticalOffs
 int main(int argc, char *argv[]) {
 
   bool quality = true;
-  bool truth = false;
+  bool timeCuts = true;
+  bool momCuts = true;
+  bool truth = true;
   bool reweightAngle = false;
+  bool verticalOffsetCorrection = false; 
+  bool acceptanceCorrection = false; 
 
   string inFileName = argv[1]; 
   string outFileName = argv[2];
@@ -529,7 +626,8 @@ int main(int argc, char *argv[]) {
   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
    
   // Fill histograms
-  Run(tree, fout, quality, truth, reweightAngle);
+  // void Run(TTree *tree, TFile *output, bool quality, bool truth, bool reweightAngle, bool verticalOffsetCorrection, bool acceptanceCorrection) {
+  Run(tree, fout, quality, timeCuts, momCuts, truth, reweightAngle, verticalOffsetCorrection, acceptanceCorrection);
 
   // Close
   fout->Close();
@@ -538,4 +636,5 @@ int main(int argc, char *argv[]) {
   cout<<"\nDone. Histogram written to:\t"<<outFileName<<" "<<fout<<endl;
    
   return 0;
+  
 }

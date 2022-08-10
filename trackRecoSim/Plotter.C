@@ -61,13 +61,55 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection = true) {
+double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double theta_y, double y) { 
+
+  // Get coordinates
+  int i = map1->GetXaxis()->FindBin(y);
+  int j = map1->GetYaxis()->FindBin(theta_y);
+
+  // Get main weighting
+  double weighting1 = map1->GetBinContent(i, j);
+  //double err_weighting1 = map1->GetBinError(i, j);
+
+  if(isnan(weighting1)) return theta_y;
+
+  // For min/max momentum 
+  if(map2==0) return theta_y * (1/weighting1);
+
+  // Get secondary weighting 
+
+    // Get coordinates
+  int i2 = map2->GetXaxis()->FindBin(y);
+  int j2 = map2->GetYaxis()->FindBin(theta_y);
+
+  double weighting2 = map2->GetBinContent(i2, j2);
+
+  // Interpolate
+  double weighting = (weighting1 + weighting2)/2;
+
+  if(isnan(weighting)) {
+    //cout<<"WARNING: acceptance wieghting is nan"<<endl;
+    return theta_y;
+  }
+
+  //cout<<theta_y * weighting<<endl;
+  //cout<<weighting<<endl;
+
+  return theta_y * (1/weighting);
+
+
+}
+
+void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection = false, bool acceptanceCorrection = true) {
 
   // Get correction histogram
   TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_trackRecoControl_WORLD_250MeV_CQ.root";
   TFile *verticalOffsetCorrectionFile = TFile::Open(verticalOffsetCorrectionFileName);
   // Book holder for vertical offset histograms 
   vector<TH1D*> verticalOffsetHists_;
+
+  TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.truth.root";
+  TFile *acceptanceFile = TFile::Open(acceptanceFileName);
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -257,6 +299,51 @@ void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection
 
       double theta_y_offset = verticalOffsetHists_.at(stn_id)->GetBinContent(verticalOffsetHists_.at(stn_id)->FindBin(p));
       theta_y = theta_y - theta_y_offset;
+
+    }
+
+    if(acceptanceCorrection) {
+
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+        int lo = 0 + i_slice*step; 
+        int hi = step + i_slice*step;
+
+        // Linear interpolation 
+
+        // What is the nearest bin centre?
+        if(p >= double(lo) && p < double(hi)) { 
+
+          TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/WeightMap_"+to_string(lo)+"_"+to_string(hi)).c_str());
+
+          double binCentre = (lo+hi)/2;
+          double new_theta_y = 0; 
+
+          //new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+          //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+          if(p<binCentre) { // Get next lowest bin 
+
+            TH2D *acceptanceHistLo = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/WeightMap_"+to_string(lo-step)+"_"+to_string(hi-step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistLo, theta_y, y);
+          
+            //cout<<"---> LO: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          } else if(p>=binCentre) { // Get next highest bin 
+
+            TH2D *acceptanceHistHi = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/WeightMap_"+to_string(lo+step)+"_"+to_string(hi+step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistHi, theta_y, y);
+
+            //cout<<"---> HI: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          }
+
+          theta_y = new_theta_y;
+
+        }
+
+      }
 
     }
 
@@ -471,6 +558,8 @@ void Run(TTree *tree, TFile *output, bool quality, bool verticalOffsetCorrection
 int main(int argc, char *argv[]) {
 
   bool quality = true;
+  bool verticalOffsetCorrection = false;
+  bool acceptanceCorrection = true;
 
   string inFileName = argv[1]; 
   string outFileName = argv[2];
@@ -489,7 +578,7 @@ int main(int argc, char *argv[]) {
   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
    
   // Fill histograms
-  Run(tree, fout, quality);
+  Run(tree, fout, quality, verticalOffsetCorrection, acceptanceCorrection);
 
   // Close
   fout->Close();

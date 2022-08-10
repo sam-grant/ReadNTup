@@ -3,7 +3,7 @@ C++ = g++
 ROOTFLAGS = $(shell root-config --cflags)
 ROOTLIBS  = $(shell root-config --libs)
 
-Target = Plotter.exe OrthogonalPlotter.exe Acceptance.exe
+Target = Plotter.exe OrthogonalPlotter.exe Acceptance.exe VerticalOffset.exe
 
 all:$(Target)
 
@@ -15,6 +15,9 @@ OrthogonalPlotter.exe: OrthogonalPlotter.C
 
 Acceptance.exe: Acceptance.C
 	${C++} -o $@ Acceptance.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
-	
+
+VerticalOffset.exe: VerticalOffset.C
+	${C++} -o $@ VerticalOffset.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
+
 clean:
 	rm *exe

@@ -23,7 +23,7 @@ void DrawTGraphErrors(TGraphErrors *graph, std::string title, std::string fname)
 
 }
 
-void Run(string config) { 
+void Run(string config) {
 
 	TFile *fin = TFile::Open(("/pnfs/GM2/persistent/EDM/MC/dMu/Trees/Alignment/"+config+"/trackTruthTrees.1.root").c_str());
 

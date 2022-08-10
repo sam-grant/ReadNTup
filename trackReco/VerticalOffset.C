@@ -1,8 +1,7 @@
-// Sam Grant 2021 
+// Plot theta_y, extrap distance, and Y in momentum bins
 
-// We have both an offset in the vertical which is depedant on both momentum and time
-// Here we produce the base histograms required for the correction: 
-// TH2D of ThetaY_vs_Time in set momentum slices, binned in g-2 peroiods
+// Read ROOT trees 
+// Sam Grant
 
 #include <iostream>
 #include <vector>
@@ -15,6 +14,9 @@
 #include "TH2D.h"
 #include "TMath.h"
 #include "TVector3.h"
+#include "TLorentzVector.h"
+#include "Math/Vector3D.h"
+#include "Math/Vector4D.h"
 #include "TRandom3.h"
 
 using namespace std;
@@ -24,60 +26,69 @@ double g2Period = (2*TMath::Pi()/omegaAMagic) * 1e-3; // 4.3653239 us
 double mMu = 105.6583715; // MeV
 double aMu = 11659208.9e-10; 
 double gmagic = std::sqrt( 1.+1./aMu );
-double pmax = 1.01 * mMu * gmagic; // 3127.1144
+double pmax = 1.01 * mMu * gmagic;
+double eMass = 0.510999;
 double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
 double pLo = 750; 
-double pHi = 2500;
+double pHi = 2750;
 
 TTree *InitTree(string fileName, string treeName) { 
 
-   // ++++++++++++++ Open tree and load branches ++++++++++++++
-   // Get file
-   TFile *fin = TFile::Open(fileName.c_str());
-   cout<<"\nOpened tree:\t"<<fileName<<" "<<fin<<endl;
+  // ++++++++++++++ Open tree and load branches ++++++++++++++
+  // Get file
+  TFile *fin = TFile::Open(fileName.c_str());
+  cout<<"\nOpened tree:\t"<<fileName<<" "<<fin<<endl;
 
-   // Get tree
-   TTree *tree = (TTree*)fin->Get(treeName.c_str());
+  // Get tree
+  TTree *tree = (TTree*)fin->Get(treeName.c_str());
 
-   cout<<"\nOpened tree:"<<treeName<<" "<<tree<<" from file "<<fileName<<" "<<fin<<endl;
+  cout<<"\nOpened tree:"<<treeName<<" "<<tree<<" from file "<<fileName<<" "<<fin<<endl;
 
-   return tree;
+  return tree;
 
 }
 
-double RandomisedTime(TRandom3 *rand, double time) { 
-  return rand->Uniform(time-T_c/2, time+T_c/2);
-}
 
-void Run(TTree *tree, TFile *output, bool quality = true, string dataset = "Run-1a") {
+void Run(TTree *tree, TFile *output, bool quality) { 
 
-  // ThetaY boost into lab frame
-  double boostFactor = 5e3*(1/gmagic);
-
-  // Slice momentum
-  int step = 125;
-  int nSlices = pmax/step;
 
   string stns[] = {"S12S18", "S12", "S18"}; 
 
   int n_stn = sizeof(stns)/sizeof(stns[0]);
 
-  TH2D *thetaY_vs_time_[n_stn];
-  vector<TH2D *> thetaY_vs_time_slices_[n_stn];
+  TH1D *p_[n_stn];
+  TH1D *Y_[n_stn];
+  TH1D *thetaY_[n_stn];
+  TH1D *extrapDist_[n_stn];
+
+  // momentum scans
+  vector<TH1D*> p_slices_[n_stn];
+  vector<TH1D*> Y_slices_[n_stn];
+  vector<TH1D*> thetaY_slices_[n_stn];
+  vector<TH1D*> extrapDist_slices_[n_stn];
+
+  // Slice momentum
+  int step = 250; 
+  int nSlices = pmax/step;
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
 
-    thetaY_vs_time_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Time").c_str(), ";Decay time [#mus];#theta_{y} [mrad] / 4.365 #mus", 92, 0, 92*g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor); 
-    
+    p_[i_stn] = new TH1D((stns[i_stn]+"_Momentum").c_str(), ";Decay vertex momentum [MeV];Vertices", int(pmax), 0, pmax); 
+    Y_[i_stn] = new TH1D((stns[i_stn]+"_Y").c_str(), ";Decay vertex position Y [mm];Vertices", 1000, -60, 60); 
+    thetaY_[i_stn] = new TH1D((stns[i_stn]+"_ThetaY").c_str(), ";#theta_{y} [mrad];Vertices", 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
+    extrapDist_[i_stn] = new TH1D((stns[i_stn]+"_ExtrapolatedDistance").c_str(), ";Decay extrapolated distance [mmm];Vertices", 1000, 0, 5000); // -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
+     
     // Slice momentum
     for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
 
       int lo = 0 + i_slice*step; 
       int hi = step + i_slice*step;
 
-      TH2D *thetaY_vs_time_slice = new TH2D((stns[i_stn]+"_ThetaY_vs_Time_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Decay time [#mus];#theta_{y} [mrad] / 4.365 #mus", 92, 0, 92*g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor); 
-      thetaY_vs_time_slices_[i_stn].push_back(thetaY_vs_time_slice);
+      p_slices_[i_stn].push_back(new TH1D((stns[i_stn]+"_Momentum_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Decay vertex momentum [MeV];Vertices", int(pmax), 0, pmax));
+      Y_slices_[i_stn].push_back(new TH1D((stns[i_stn]+"_Y_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Decay vertex position Y [mm];Vertices", 1000, -60, 60)); 
+      thetaY_slices_[i_stn].push_back(new TH1D((stns[i_stn]+"_ThetaY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";#theta_{y} [mrad];Tracks",  1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic));
+      extrapDist_slices_[i_stn].push_back(new TH1D((stns[i_stn]+"_ExtrapolatedDistance_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Decay extrapolated distance [mmm];Vertices", 1000, 0, 5000)); 
 
     }
 
@@ -86,68 +97,54 @@ void Run(TTree *tree, TFile *output, bool quality = true, string dataset = "Run-
   // Get branches (using header file)
   InitBranches br(tree);
 
-  double targetPerc = 0;
   int64_t nEntries = tree->GetEntries();
 
+  double targetPerc = 0;
   double muAngleMax = 0;
 
-  int64_t counter = 0;
-
-  // For FR randomisation
-  TRandom3 *rand = new TRandom3(12345);
-   
   for(int64_t entry = 0; entry < nEntries; entry++) {
 
     tree->GetEntry(entry);
 
-    double time = RandomisedTime(rand, br.decayTime * 1e-3); // randomise out the FR
-
-    double px = br.decayVertexMomX; double py = -br.decayVertexMomY; double pz = br.decayVertexMomZ; 
-
     bool vertexQual = br.passDecayVertexQuality;
+    int stn = br.station; 
+    double time = br.decayTime * 1e-3; // us
+
+    TVector3 ePos(br.decayVertexPosX, br.decayVertexPosY, br.decayVertexPosZ);
+    TVector3 eMom(br.decayVertexMomX, -br.decayVertexMomY, br.decayVertexMomZ); 
+
+    double p = eMom.Mag();
+    double extrapDist = br.decayExtrapolatedDistance;
 
     // Time cuts
-    if (quality && !vertexQual) continue;
+    if (quality) {
+      if (time < g2Period*7) continue; 
+      if (!vertexQual) continue;
+    }
 
-    int stn = br.station; 
-
-    // Positron world momentum
-    TVector3 eMom(px, py, pz); 
-    double p = eMom.Mag();
-      
     /////////////////////////////////
     //                             //
     // Define the vertical angle   //
     //                             //
     /////////////////////////////////
 
-    // If the you have the vertex cut switched on, py must be negative
-    double theta_y = asin(py/p);
+    double theta_y = asin(eMom.y()/p);
+
     theta_y = theta_y * 1e3;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // All stations 
-    int stn_id = 0;
 
-    if(p > pLo && p < pHi) thetaY_vs_time_[stn_id]->Fill(time, theta_y);
-
-    // Slice momentum 
-    for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
-
-      int lo = 0 + i_slice*step; 
-      int hi = step + i_slice*step;
-
-      if(p >= double(lo) && p < double(hi)) thetaY_vs_time_slices_[stn_id].at(i_slice)->Fill(time, theta_y);
-
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // Stn 12 or stn 18
+    // Fill stations invidually according the station array
+    int stn_id = -1;
     if(stn==12) stn_id = 1;
     else if(stn==18) stn_id = 2;
     else cerr<<"Station "<<stn<<" not recognised";
 
-    if(p > pLo && p < pHi) thetaY_vs_time_[stn_id]->Fill(time, theta_y);
+    // Fill histograms
+    p_[stn_id]->Fill(p);
+    Y_[stn_id]->Fill(ePos.y());
+    thetaY_[stn_id]->Fill(theta_y);
+    extrapDist_[stn_id]->Fill(extrapDist);
 
     // Slice momentum 
     for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
@@ -155,32 +152,60 @@ void Run(TTree *tree, TFile *output, bool quality = true, string dataset = "Run-
       int lo = 0 + i_slice*step; 
       int hi = step + i_slice*step;
 
-      if(p >= double(lo) && p < double(hi)) thetaY_vs_time_slices_[stn_id].at(i_slice)->Fill(time, theta_y);
+      if(p >= double(lo) && p < double(hi)) { 
+
+        p_slices_[stn_id].at(i_slice)->Fill(p);
+        Y_slices_[stn_id].at(i_slice)->Fill(ePos.y());
+        thetaY_slices_[stn_id].at(i_slice)->Fill(theta_y);
+        extrapDist_slices_[stn_id].at(i_slice)->Fill(extrapDist);
+
+      }
 
     }
 
-/*    if(100*float(entry) / nEntries > targetPerc) {
+    if(100*float(entry) / nEntries > targetPerc) {
       cout << Form("Processed %.1f%%", 100*float(entry)/nEntries) << endl;
       targetPerc += 10;
-    }*/
+    }
 
+  }
+
+  // Combine stations S12&S18
+  p_[0]->Add(p_[1],p_[2]);
+  Y_[0]->Add(Y_[1], Y_[2]);
+  thetaY_[0]->Add(thetaY_[1], thetaY_[2]);
+  extrapDist_[0]->Add(extrapDist_[1], extrapDist_[2]);
+
+   for ( int i_slice(0); i_slice < nSlices; i_slice++ ) {
+
+      p_slices_[0].at(i_slice)->Add(p_slices_[1].at(i_slice), p_slices_[2].at(i_slice));
+      Y_slices_[0].at(i_slice)->Add(Y_slices_[1].at(i_slice), Y_slices_[2].at(i_slice));
+      thetaY_slices_[0].at(i_slice)->Add(thetaY_slices_[1].at(i_slice), thetaY_slices_[2].at(i_slice));
+      extrapDist_slices_[0].at(i_slice)->Add(extrapDist_slices_[1].at(i_slice), extrapDist_slices_[2].at(i_slice));
+      
   }
 
   // Write to output
   // Set output directory
-  output->mkdir("MainPlots"); output->mkdir("MomSlices");  
+  output->mkdir("SimultaneousAnalysis"); output->mkdir("MomentumBinnedAnalysis");  
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
 
-    output->cd("MainPlots");
+    output->cd("SimultaneousAnalysis");
 
-    thetaY_vs_time_[i_stn]->Write();
+    p_[i_stn]->Write();
+    Y_[i_stn]->Write();
+    thetaY_[i_stn]->Write();
+    extrapDist_[i_stn]->Write();
 
    for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) {
 
-      output->cd("MomSlices"); 
+      output->cd("MomentumBinnedAnalysis"); 
 
-      thetaY_vs_time_slices_[i_stn].at(i_slice)->Write();
+      p_slices_[i_stn].at(i_slice)->Write();
+      Y_slices_[i_stn].at(i_slice)->Write();
+      thetaY_slices_[i_stn].at(i_slice)->Write();
+      extrapDist_slices_[i_stn].at(i_slice)->Write();
       
     }
 
@@ -194,36 +219,33 @@ void Run(TTree *tree, TFile *output, bool quality = true, string dataset = "Run-
 
 int main(int argc, char *argv[]) {
 
-   bool quality = true;
+  bool quality = true;
 
-   string inFileName = argv[1];
-   string outFileName = argv[2];
-   string dataset = argv[3];
+  string inFileName = argv[1]; 
+  string outFileName = argv[2];
 
-/* string inFileName = "/gm2/data/g2be/Production/Trees/Run1/trackRecoTrees_15921.root";
-   string outFileName = "trackRecoPlots_15921.root";*/
+  string treeName = "trackAndTrackCalo/tree";
 
-   string treeName = "trackAndTrackCalo/tree";
+  // Open tree and load branches
+  TFile *fin = TFile::Open(inFileName.c_str());
 
-   // Open tree and load branches
-   TFile *fin = TFile::Open(inFileName .c_str());
-   // Get tree
-   TTree *tree = (TTree*)fin->Get(treeName.c_str());
+  // Get tree
+  TTree *tree = (TTree*)fin->Get(treeName.c_str());
 
-   cout<<"\nOpened tree:\t"<<treeName<<" "<<tree<<" from file "<<inFileName<<" "<<fin<<endl;
+  cout<<"\nOpened tree:\t"<<treeName<<" "<<tree<<" from file "<<inFileName<<" "<<fin<<endl;
 
-   // Book output
-   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
+  // Book output
+
+  TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
    
-   // Fill histograms
-   Run(tree, fout, quality);
+  // Fill histograms
+  Run(tree, fout, quality); 
 
-   // Close
-   fout->Close();
-   fin->Close();
+  // Close
+  fout->Close();
+  fin->Close();
 
-   cout<<"\nDone. Histogram written to:\t"<<outFileName<<" "<<fout<<endl;
+  cout<<"\nDone. Histogram written to:\t"<<outFileName<<" "<<fout<<endl;
    
-   return 0;
-
+  return 0;
 }

@@ -1,11 +1,12 @@
 # Get arguments (sam dataset and number of cores to use)
 if [ "$#" -ne 2 ]; then
-  echo "Number of cores and dataset required as arguments"
+  echo "Number of cores and dataset required as arguments. EG: . submit.sh Run-1a 2 "
   return
 fi
 
-nCores=$1
-dataset=$2 
+dataset=$1 
+nCores=$2
+
 
 if [[ $dataset == "Run-1a" ]]; then
   datasetName="gm2pro_daq_full_run1_60h_5039A_GLdocDB16021-v2"
@@ -23,10 +24,12 @@ if [ ! -d ${datasetName} ]; then
 ##########################################################
 # Comment if re-submitting and you don't want to overwrite 
 else 
- rm -f ${datasetName}/*.root
+rm -f ${datasetName}/*.root
 ##########################################################
 
 fi
+
+echo $datasetName
 
 dir="/gm2/data/g2be/Production/Trees/Run1" 
 
@@ -35,3 +38,7 @@ for run in `cat txt/${datasetName}.txt`; do
   echo "${dir}/trackRecoTrees_${run}.root" "${datasetName}/trackRecoPlots_${run}.root" $dataset
   
 done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
+
+sleep 5
+
+hadd -f plots_${dataset}.root ${datasetName}/trackRecoPlots_*.root

@@ -19,16 +19,22 @@
 
 using namespace std;
 
-double omegaAMagic = 0.00143934; // from gm2geom consts / kHz 
-double g2Period = (2*TMath::Pi()/omegaAMagic) * 1e-3; // 4.3653239 us
+double omegaAMagic = 1.439311; // BNL mu+ average // 0.00143934; // from gm2geom consts / kHz 
+double g2Period = (2*TMath::Pi()/omegaAMagic); // * 1e-3; // 4.3653239 us
 double mMu = 105.6583715; // MeV
 double aMu = 11659208.9e-10; 
 double gmagic = std::sqrt( 1.+1./aMu );
 double pmax = 1.01 * mMu * gmagic; // 3127.1144
 double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
-double pLo = 750; 
-double pHi = 2750;
+double pLo = 1000; 
+double pHi = 2500;
+
+//double n = 0.108; // Run-1a / Run-1d
+//double n = 0.120; // Run-1b / Run-1c
+double f_c = 6.7024; // MHz
+//double T_y = 1/(f_c*sqrt(n)); 
+//double T_x = 1/(f_c - (f_c*sqrt(1-n)));
 
 TTree *InitTree(string fileName, string treeName) { 
 
@@ -60,7 +66,58 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true, bool timeRandomisation=true, bool verticalOffsetCorrection=true) {
+double RandomisedTimeVB(TRandom3 *rand, double time, string ds) {
+
+  double n;
+  if(ds=="Run-1a" || ds=="Run-1d") n = 0.108; // Run-1a / Run-1d
+  else if(ds=="Run-1b" || ds=="Run-1c") n = 0.120; // Run-1b / Run-1c
+  else cerr<<"RandomisedTimeVB(): Dataset not valid!";
+
+  double T_y = 1/(f_c*sqrt(n));
+
+  return rand->Uniform(time-T_y/2, time+T_y/2);
+}
+
+double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double theta_y, double y) { 
+
+  // Get coordinates
+  int i = map1->GetXaxis()->FindBin(y);
+  int j = map1->GetYaxis()->FindBin(theta_y);
+
+  // Get main weighting
+  double weighting1 = map1->GetBinContent(i, j);
+  //double err_weighting1 = map1->GetBinError(i, j);
+
+  if(isnan(weighting1)) return theta_y;
+
+  // For min/max momentum 
+  if(map2==0) return theta_y * (1/weighting1);
+
+  // Get secondary wighting 
+
+    // Get coordinates
+  int i2 = map2->GetXaxis()->FindBin(y);
+  int j2 = map2->GetYaxis()->FindBin(theta_y);
+
+  double weighting2 = map2->GetBinContent(i2, j2);
+
+  // Interpolate
+  double weighting = (weighting1 + weighting2)/2;
+
+  if(isnan(weighting)) {
+    //cout<<"WARNING: acceptance wieghting is nan"<<endl;
+    return theta_y;
+  }
+
+  //cout<<theta_y * weighting<<endl;
+  //cout<<weighting<<endl;
+
+  return theta_y * (1/weighting);
+
+
+}
+
+void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true, bool timeRandomisation=true, bool verticalOffsetCorrection=false, bool acceptanceCorr=false) {
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -103,12 +160,22 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
   vector<TH2D*> thetaY_vs_time_mod_long_50ns_slices_[n_stn];
 
   // Slice momentum
-  int step = 125;
+  int step = 250;
   int nSlices = pmax/step;
 
   // Vertical offset correction 
-  TFile *verticalOffsetCorrectionFile = TFile::Open(("correctionPlots/verticalOffsetFits_"+dataset+"_"+to_string(step)+"MeV_BQ.root").c_str()); 
-  vector<vector<TF1*>> verticalOffsetFits_; 
+  TFile *verticalOffsetFile = TFile::Open(("correctionPlots/verticalOffsetFits_"+dataset+"_"+to_string(step)+"MeV_BQ.root").c_str()); 
+  vector<vector<TF1*>> verticalOffsetFits_;
+//  TGraphErrors* verticalOffsetGraph;
+//  TF1 *verticalOffsetFunc;
+//  if(verticalOffsetCorrection) {
+//    verticalOffsetGraph = (TGraphErrors*)verticalOffsetFile->Get("MainPlots/S12S18_ThetaY_vs_Time_Fit");
+//    verticalOffsetFunc = (TF1*)verticalOffsetGraph->GetFunction("DoubleExponentialFunc");
+//  }
+
+  // Acceptance correction
+  TString acceptanceFileName = "correctionPlots/acceptanceWeightingPlots.truth.root";
+  TFile *acceptanceFile = TFile::Open(acceptanceFileName);
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
 
@@ -140,7 +207,7 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
       int hi = step + i_slice*step;
 
       // Store vertical offset correction fit
-      TGraphErrors* gr_verticalOffsetFit = (TGraphErrors*)verticalOffsetCorrectionFile->Get(("MomBinnedAna/"+stns[i_stn]+"_ThetaY_vs_Time_Fit_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str());
+      TGraphErrors* gr_verticalOffsetFit = (TGraphErrors*)verticalOffsetFile->Get(("MomBinnedAna/"+stns[i_stn]+"_ThetaY_vs_Time_Fit_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str());
       if(gr_verticalOffsetFit==0) verticalOffsetFitsPerStn_.push_back(0);
       else verticalOffsetFitsPerStn_.push_back(gr_verticalOffsetFit->GetFunction("DoubleExponentialFunc"));
 
@@ -200,21 +267,24 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
     // quality variables
     double time = br.decayTime * 1e-3; // ns -> us
 
-    if(timeRandomisation) time = RandomisedTime(rand, time); // randomise out the FR
+    if(timeRandomisation) {
+      time = RandomisedTime(rand, time); // randomise out the FR
+      time = RandomisedTimeVB(rand, time, dataset); // randomise out the VB
+      //time = RandomisedTimeHB(rand, time); // randomise out the HB (only for EG)
+    }
 
     double x = br.decayVertexPosX; double y = br.decayVertexPosY; double z = br.decayVertexPosZ; 
     double px = br.decayVertexMomX; double py = -br.decayVertexMomY; double pz = br.decayVertexMomZ; 
-
     bool hitVol = br.hitVolume;
     double pVal = br.trackPValue;
     bool vertexQual = br.passDecayVertexQuality;
 
     // Time cuts
     if (quality) {
-
-      if (time < g2Period*7 || time > g2Period*70) continue; 
+      if(time < g2Period*7) continue;
+      if (time < g2Period*12 && dataset == "Run-1d") continue; // delayed start time for EG
       if (!vertexQual) continue;
-
+      //if (time > g2Period*15) continue;
     }
 
     int stn = br.station; 
@@ -247,11 +317,15 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
     else if(stn==18) stn_id = 1;
     else cerr<<"Station "<<stn<<" not recognised";
 
-    // Vertical offset correction
+//    // Vertical offset correction (time only)
     if(verticalOffsetCorrection) {
+//      double c = verticalOffsetFunc->GetParameter(4); 
+//      theta_y = theta_y - verticalOffsetFunc->Eval(time);
+//      theta_y = theta_y + c; // only correct the time dependant part
+//    }
 
-      // Vertical offset correction
-      TF1 *verticalOffsetCorrectionFunc; 
+      // Vertical offset correction in momentum and time
+      TF1 *verticalOffsetFunc; 
 
       // Slice momentum 
       for ( int i_slice = 0; i_slice < nSlices; i_slice++) { 
@@ -261,20 +335,74 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
         if(p >= double(lo) && p < double(hi)) {
 
-          verticalOffsetCorrectionFunc = (verticalOffsetFits_.at(stn_id)).at(i_slice);
+          verticalOffsetFunc = (verticalOffsetFits_.at(stn_id)).at(i_slice);
 
         }
 
       }
 
-      theta_y = theta_y - verticalOffsetCorrectionFunc->Eval(time);
+      theta_y = theta_y - verticalOffsetFunc->Eval(time);
 
-    }    
+    }  
+
+    // I don't actually use any of the acceptance stuff
+    if(acceptanceCorr) {
+
+      //double new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+      //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+
+      //TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get("InverseAcceptanceWeighting/AllMom/WeightMap");
+
+      //cout<<"\n ---> theta_y = "<<theta_y<<endl;
+
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+        int lo = 0 + i_slice*step; 
+        int hi = step + i_slice*step;
+
+        // Linear interpolation 
+
+        // What is the nearest bin centre?
+        if(p >= double(lo) && p < double(hi)) { 
+
+          TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo)+"_"+to_string(hi)).c_str());
+
+          double binCentre = (lo+hi)/2;
+          double new_theta_y = 0; 
+
+          //new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+          //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+          if(p<binCentre) { // Get next lowest bin 
+
+            TH2D *acceptanceHistLo = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo-step)+"_"+to_string(hi-step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistLo, theta_y, y);
+          
+            //cout<<"---> LO: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          } else if(p>=binCentre) { // Get next highest bin 
+
+            TH2D *acceptanceHistHi = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo+step)+"_"+to_string(hi+step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistHi, theta_y, y);
+
+            //cout<<"---> HI: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          }
+
+          theta_y = new_theta_y;
+
+        }
+
+      }
+
+    }
 
     decayZ_vs_decayX_[stn_id]->Fill(x, z);
  
-    // g-2 cuts. See Fienberg thesis figure 2.10
-    if(p > 1900  && p < pmax) {
+    // g-2 cuts
+    if(p > 1700  && p < pmax) {
       wiggle_[stn_id]->Fill(time);
       wiggle_mod_[stn_id]->Fill(g2ModTime);
       if(time > 8*g2Period) wiggle_mod_long_[stn_id]->Fill(longModTime);
@@ -437,7 +565,7 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
   cout<<"Written plots."<<endl;
 
-  verticalOffsetCorrectionFile->Close();
+  verticalOffsetFile->Close();
 
   return;
 
@@ -446,7 +574,9 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 int main(int argc, char *argv[]) {
 
    bool quality = true;
-   bool verticalOffsetCorrection = true;
+   bool timeRandomisation = true;
+   bool verticalOffsetCorrection = false;//true;
+   bool acceptanceCorrection = false;
 
    string inFileName = argv[1]; 
    string outFileName = argv[2]; 
@@ -470,7 +600,7 @@ int main(int argc, char *argv[]) {
    TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
    
    // Fill histograms
-   Run(tree, fout, dataset, quality, verticalOffsetCorrection);
+    Run(tree, fout, dataset, quality, timeRandomisation, verticalOffsetCorrection, acceptanceCorrection);
 
    // Close
    fout->Close();

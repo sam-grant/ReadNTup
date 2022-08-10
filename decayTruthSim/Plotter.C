@@ -28,8 +28,8 @@ double pmax = 1.01 * mMu * gmagic;
 double eMass = 0.510999;
 double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
-double pLo = 750; 
-double pHi = 2750;
+double pLo = 1000; 
+double pHi = 2500;
 
 TTree *InitTree(string fileName, string treeName) { 
 
@@ -61,40 +61,125 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-bool AcceptedDecayY(double py, double y) { 
+double AcceptanceWeightedAngle(TH2D *map, double theta_y, double y) { 
 
-  // Vertical
-  if(y >= -50 && y < -40 && py >= -0.49 && py < 66.01) return true;  
-  else if(y >= -40 && y < -30 && py >= -15.19 && py < 69.51) return true;  
-  else if(y >= -30 && y < -20 && py >= -30.03 && py < 68.53) return true; 
-  else if(y >= -20 && y < -10 && py >= -42.21 && py < 63.77) return true; 
-  else if(y >= -10 && y < 0 && py >= -57.19 && py < 60.27) return true; 
-  else if(y >= 0 && y < 10 && py >= -57.47 && py < 49.35) return true; 
-  else if(y >= 10 && y < 20 && py >= -64.89 && py < 39.27) return true; 
-  else if(y >= 20 && y < 30 && py >= -66.43 && py < 28.21) return true; 
-  else if(y >= 30 && y < 40 && py >= -66.57 && py < 15.05) return true; 
-  else if(y >= 40 && y < 50 && py >= -68.39 && py < -0.07) return true; 
-  else return false;
+  int i = map->GetXaxis()->FindBin(y);
+  int j = map->GetYaxis()->FindBin(theta_y);
 
-}
+  double weighting = map->GetBinContent(i, j);
 
-bool AcceptedDecayX(double px) { 
+<<<<<<< HEAD
+  if(isnan(weighting)) {
+    return 0;
+  }
 
-  // Radial
-  if(px >= -0.14 && px < 0.14) return true;
-  else return true;
+  return weighting;
+=======
+  //cout<<"weighting: "<<weighting<<endl;
+
+  return theta_y * weighting;
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+
 
 }
 
-void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bool verticalOffsetCorrection = true) {
+<<<<<<< HEAD
+// I don't think this helps. 
+=======
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double theta_y, double y) { 
+
+  // Get coordinates
+  int i = map1->GetXaxis()->FindBin(y);
+  int j = map1->GetYaxis()->FindBin(theta_y);
+
+  // Get main weighting
+  double weighting1 = map1->GetBinContent(i, j);
+<<<<<<< HEAD
+  //double err_weighting1 = map1->GetBinError(i, j);
+
+  if(isnan(weighting1)) return weighting1;
+
+  // For min/max momentum 
+  if(map2==0) return weighting1;
+
+  // Get secondary weighting 
+
+  // Get coordinates
+=======
+
+  if(isnan(weighting1)) return theta_y;
+
+  // For min/max momentum 
+  if(map2==0) return theta_y * weighting1;
+
+  // Get secondary weighting 
+
+    // Get coordinates
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+  int i2 = map2->GetXaxis()->FindBin(y);
+  int j2 = map2->GetYaxis()->FindBin(theta_y);
+
+  double weighting2 = map2->GetBinContent(i2, j2);
+
+  // Interpolate
+  double weighting = (weighting1 + weighting2)/2;
+
+<<<<<<< HEAD
+  if(isnan(weighting)) {
+    //cout<<"WARNING: acceptance wieghting is nan"<<endl;
+    return 0;//theta_y;
+  }
+=======
+  if(isnan(weighting)) return theta_y;
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+
+  //cout<<theta_y * weighting<<endl;
+  //cout<<weighting<<endl;
+
+<<<<<<< HEAD
+  return weighting;
+=======
+  return theta_y * weighting;
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+
+
+}
+
+<<<<<<< HEAD
+void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bool verticalOffsetCorrection, bool acceptanceCorr, string stn) {
+
+  // Get vertical offset correction histograms
+  TString verticalOffsetFileName = "correctionHists/verticalOffsetHists_allDecays_WORLD_250MeV_AQ.root";
+  TFile *verticalOffsetFile = TFile::Open(verticalOffsetFileName);
+  TH1D *verticalOffsetHist = (TH1D*)verticalOffsetFile->Get("VerticalOffsetHists/ThetaY_vs_p");
+
+  TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.truth.root";
+  TFile *acceptanceFile = TFile::Open(acceptanceFileName);
+
+  //TH2D *acceptanceHistAllMom = (TH2D*)acceptanceFile->Get(("AcceptanceWeighting/AllMom/750_2500_MeV/"+stn+"_AcceptanceMap").c_str());
+  //cout<<acceptanceHistAllMom<<endl;
+
+  vector<TH2D*> acceptanceHists_; 
+=======
+void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bool verticalOffsetCorrection = true, bool acceptanceCorr = true) {
 
   // Get correction histogram
   //TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecays_WORLD_250MeV_AQ.root";
-  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecaysControl_WORLD_250MeV_AQ.root";
   //TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_allDecays_WORLD_250MeV_AQ.root";
+
+  TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_acceptedDecaysControl_WORLD_250MeV_AQ.root";
   TFile *verticalOffsetCorrectionFile = TFile::Open(verticalOffsetCorrectionFileName);
+
   TH1D* verticalOffsetHist = (TH1D*)verticalOffsetCorrectionFile->Get("VerticalOffsetHists/ThetaY_vs_p");
 
+  TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.root";
+  TFile *acceptanceFile = TFile::Open(acceptanceFileName);
+  // TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get("InverseAcceptanceWeighting/AllMom/WeightMap");
+
+ // cout<<"Got acceptance map for all momentum: "<<acceptanceHist<<endl;
+
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
 
@@ -106,6 +191,8 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     boostFactor = 1.0e3;
     momBoostFactor = (1/(2*gmagic));
   }
+
+  // ------ Book histograms -------
 
   TH1D *momentum = new TH1D("Momentum", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
   TH1D *momY = new TH1D("MomentumY", ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
@@ -126,17 +213,21 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
   TH2D *thetaY_vs_time_mod_long_20ns = new TH2D("ThetaY_vs_Time_Modulo_Long_20ns", ";Time modulo [#mus]; #theta_{y} [mrad] / 20 ns", 174*moduloMultiple, 0, g2Period*moduloMultiple, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time_mod_long_50ns = new TH2D("ThetaY_vs_Time_Modulo_Long_50ns", ";Time modulo [#mus]; #theta_{y} [mrad] / 50 ns", 87*moduloMultiple, 0, g2Period*moduloMultiple, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_momentum = new TH2D("ThetaY_vs_Momentum", ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+  TH2D *thetaY_vs_Y = new TH2D("ThetaY_vs_Y", ";Decay y-position [mm];#theta_{y} [mrad]", 24, -60, 60, 40, -100, 100);
+
   // Momentum scans
   vector<TH1D*> thetaY_mom_slices_;
   vector<TH1D*> Y_mom_slices_;
   vector<TH1D*> pY_mom_slices_;
   vector<TH1D*> p_mom_slices_;
+  vector<TH2D*> thetaY_vs_Y_mom_slices_;
   vector<TH2D*> thetaY_vs_time_mod_slices_;
   vector<TH2D*> thetaY_vs_time_mod_20ns_slices_;
   vector<TH2D*> thetaY_vs_time_mod_50ns_slices_;
   vector<TH2D*> thetaY_vs_time_mod_long_slices_;
   vector<TH2D*> thetaY_vs_time_mod_long_20ns_slices_;
   vector<TH2D*> thetaY_vs_time_mod_long_50ns_slices_;
+  
 
   // Slice momentum
   int step = 250 * momBoostFactor;
@@ -178,7 +269,13 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     TH1D *h_thetaY_mom_slice = new TH1D(("ThetaY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";#theta_{y} [mrad];Tracks",  500, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
     thetaY_mom_slices_.push_back(h_thetaY_mom_slice);
 
+    TH2D *thetaY_vs_Y_mom_slice = new TH2D(("ThetaY_vs_Y_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Decay y-position [mm];#theta_{y} [mrad]", 24, -60, 60, 40, -100, 100);
+    thetaY_vs_Y_mom_slices_.push_back(thetaY_vs_Y_mom_slice);
+
+    acceptanceHists_.push_back((TH2D*)acceptanceFile->Get(("AcceptanceWeighting/MomBins/"+stn+"_WeightMap_"+to_string(lo)+"_"+to_string(hi)).c_str()));
+
   }
+
 
   // Get branches (using header file)
   InitBranches br(tree);
@@ -231,8 +328,8 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
 
       //rotation not perfect, so if original y component was 0 force that to be the case:
       if (fabs(muPol.y()) < 1E-10){
-	     muPol = TVector3(muPol.x(), 0.0, muPol.z());
-	     muPol = muPol.Unit();
+       muPol = TVector3(muPol.x(), 0.0, muPol.z());
+       muPol = muPol.Unit();
       }
 
       double muP = br.muDecayP;
@@ -290,23 +387,149 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     // convert into mrad (always forget to do this so I'm putting it here)
     theta_y = theta_y * 1e3;
 
-    // Correct offset
+    // Correct offset (no time dependance here)
     if(verticalOffsetCorrection) {
 
       double theta_y_offset = verticalOffsetHist->GetBinContent(verticalOffsetHist->FindBin(p));
       theta_y = theta_y - theta_y_offset;
 
     }
+    
+    // Apply momentum dependant acceptance weighting
+<<<<<<< HEAD
+     // cout<<"\ntheta_y (unweighted) = "<<theta_y<<endl;
+    
+    double acceptanceWeighting = 1.0;
 
-    if(!AcceptedDecayY(py, y)) continue;// || !AcceptedDecayX(px)) continue;
+    if(acceptanceCorr) {
+      
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
 
+        int lo = 0 + i_slice*step; 
+        int hi = step + i_slice*step;
+
+        if(p >= double(lo) && p < double(hi)) { 
+
+          acceptanceWeighting = AcceptanceWeightedAngle(acceptanceHists_.at(i_slice), theta_y, y);
+
+        }
+
+      }
+
+    }
+
+
+/*
+          TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get(("AcceptanceWeightings/"+to_string(lo)+"_"+to_string(hi)+"_MeV/"+stn+"_AcceptanceMap").c_str());
+
+          if(acceptanceHist==0) acceptanceHist = acceptanceHistAllMom;
+
+          double binCentre = (lo+hi)/2;
+          double new_theta_y = 0; 
+
+          if(p<binCentre) { // Get next lowest bin 
+
+            TH2D *acceptanceHistLo = (TH2D*)acceptanceFile->Get(("AcceptanceWeightings/"+to_string(lo-step)+"_"+to_string(hi-step)+"_MeV/"+stn+"_AcceptanceMap").c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistLo, theta_y, y);
+          
+            //cout<<"---> LO: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+
+          } else if(p>=binCentre) { // Get next highest bin 
+
+            TH2D *acceptanceHistHi = (TH2D*)acceptanceFile->Get(("AcceptanceWeightings/"+to_string(lo+step)+"_"+to_string(hi+step)+"_MeV/"+stn+"_AcceptanceMap").c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistHi, theta_y, y);
+
+            //cout<<"---> HI: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          }
+
+          if(!isnan(new_theta_y)) {
+
+            theta_y = new_theta_y;
+
+            //cout<<"---> RESULT:\nnew theta_y = "<<new_theta_y<<endl;
+        
+          } */
+
+       // }
+
+
+    //cout<<"theta_y (weighted) = "<<theta_y<<endl;
+=======
+    //cout<<"\ntheta_y "<<theta_y<<endl;
+    if(acceptanceCorr) {
+
+
+
+
+      //double new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+      //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+
+
+      //TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get("InverseAcceptanceWeighting/AllMom/WeightMap");
+
+      //cout<<"\n ---> theta_y = "<<theta_y<<endl;
+
+      // Slice momentum 
+      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
+
+        int lo = 0 + i_slice*step; 
+        int hi = step + i_slice*step;
+
+        // Linear interpolation 
+
+        // What is the nearest bin centre?
+        if(p >= double(lo) && p < double(hi)) { 
+
+          TH2D *acceptanceHist = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo)+"_"+to_string(hi)).c_str());
+
+          double binCentre = (lo+hi)/2;
+          double new_theta_y = 0; 
+          //new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
+          //if(!isnan(new_theta_y)) theta_y = new_theta_y;
+
+          if(p<binCentre) { // Get next lowest bin 
+
+            TH2D *acceptanceHistLo = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo-step)+"_"+to_string(hi-step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistLo, theta_y, y);
+          
+            //cout<<"---> LO: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+
+          } else if(p>=binCentre) { // Get next highest bin 
+
+            TH2D *acceptanceHistHi = (TH2D*)acceptanceFile->Get(("InverseAcceptanceWeighting/MomBins/WeightMap_"+to_string(lo+step)+"_"+to_string(hi+step)).c_str());
+            new_theta_y = AcceptanceWeightedAngleWithInterpolation(acceptanceHist, acceptanceHistHi, theta_y, y);
+
+            //cout<<"---> HI: \np = "<<p<<"\nbin centre = "<<binCentre<<"\nnew theta_y = "<<new_theta_y<<endl;
+
+          }
+
+
+          if(!isnan(new_theta_y)) {
+
+            theta_y = new_theta_y;
+
+            //cout<<"---> RESULT:\nnew theta_y = "<<new_theta_y<<endl;
+        
+          } 
+
+        }
+
+      }
+
+    }
+    //cout<<"theta_y "<<theta_y<<endl;
+    //cout<<"theta_y = "<<theta_y<<endl;
     // Time cuts
-    if(quality && (time < g2Period*7 || time > g2Period*70)) continue; 
+    if(timeCuts && time < g2Period*7) continue; 
 
     decayZ_vs_decayX->Fill(ePos.X(), ePos.Z());
 
-    // g-2 cuts. See Fienberg thesis figure 2.10
-    if(p > 1900  && p < pmax*momBoostFactor) {
+    if(p > 1700) { //  && p < pmax*momBoostFactor) {
       wiggle->Fill(time);
       wiggle_mod->Fill(g2ModTime);
       if(time>8*g2Period) wiggle_mod_long->Fill(longModTime);
@@ -317,38 +540,40 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     momZ->Fill(pz);
 
     // EDM cuts
-    if( quality && p > pLo*momBoostFactor && p < pHi*momBoostFactor) { 
+    if(momCuts && p > pLo*momBoostFactor && p < pHi*momBoostFactor) { 
 
       momentum->Fill(p);
-      thetaY->Fill(theta_y);
-      thetaY_vs_time->Fill(time, theta_y);
-      thetaY_vs_time_20ns->Fill(time, theta_y);
-      thetaY_vs_time_50ns->Fill(time, theta_y);
-      thetaY_vs_time_mod->Fill(g2ModTime, theta_y);
-      thetaY_vs_time_mod_50ns->Fill(g2ModTime, theta_y);
-      thetaY_vs_momentum->Fill(p, theta_y);
+      thetaY->Fill(theta_y, acceptanceWeighting);
+      thetaY_vs_time->Fill(time, theta_y, acceptanceWeighting);
+      thetaY_vs_time_20ns->Fill(time, theta_y, acceptanceWeighting);
+      thetaY_vs_time_50ns->Fill(time, theta_y, acceptanceWeighting);
+      thetaY_vs_time_mod->Fill(g2ModTime, theta_y, acceptanceWeighting);
+      thetaY_vs_time_mod_50ns->Fill(g2ModTime, theta_y, acceptanceWeighting);
+      thetaY_vs_momentum->Fill(p, theta_y, acceptanceWeighting);
+      thetaY_vs_Y->Fill(y, theta_y, acceptanceWeighting);
 
       if(time > 8*g2Period) {
-        thetaY_vs_time_mod_long->Fill(longModTime, theta_y);
-        thetaY_vs_time_mod_long_20ns->Fill(longModTime, theta_y); 
-        thetaY_vs_time_mod_long_50ns->Fill(longModTime, theta_y);    
+        thetaY_vs_time_mod_long->Fill(longModTime, theta_y, acceptanceWeighting);
+        thetaY_vs_time_mod_long_20ns->Fill(longModTime, theta_y, acceptanceWeighting); 
+        thetaY_vs_time_mod_long_50ns->Fill(longModTime, theta_y, acceptanceWeighting);    
       }  
 
-    } else if(!quality) { 
+    } else if(!momCuts) { 
 
       momentum->Fill(p);
-      thetaY->Fill(theta_y);
-      thetaY_vs_time->Fill(time, theta_y);
-      thetaY_vs_time_20ns->Fill(time, theta_y);
-      thetaY_vs_time_50ns->Fill(time, theta_y);
-      thetaY_vs_time_mod->Fill(g2ModTime, theta_y);
-      thetaY_vs_time_mod_50ns->Fill(g2ModTime, theta_y);
-      thetaY_vs_momentum->Fill(p, theta_y);
+      thetaY->Fill(theta_y, acceptanceWeighting);
+      thetaY_vs_time->Fill(time, theta_y, acceptanceWeighting);
+      thetaY_vs_time_20ns->Fill(time, theta_y, acceptanceWeighting);
+      thetaY_vs_time_50ns->Fill(time, theta_y, acceptanceWeighting);
+      thetaY_vs_time_mod->Fill(g2ModTime, theta_y, acceptanceWeighting);
+      thetaY_vs_time_mod_50ns->Fill(g2ModTime, theta_y, acceptanceWeighting);
+      thetaY_vs_momentum->Fill(p, theta_y, acceptanceWeighting);
+      thetaY_vs_Y->Fill(y, theta_y, acceptanceWeighting);
 
       if(time > 8*g2Period) {
-        thetaY_vs_time_mod_long->Fill(longModTime, theta_y);
-        thetaY_vs_time_mod_long_20ns->Fill(longModTime, theta_y); 
-        thetaY_vs_time_mod_long_50ns->Fill(longModTime, theta_y);    
+        thetaY_vs_time_mod_long->Fill(longModTime, theta_y, acceptanceWeighting);
+        thetaY_vs_time_mod_long_20ns->Fill(longModTime, theta_y, acceptanceWeighting); 
+        thetaY_vs_time_mod_long_50ns->Fill(longModTime, theta_y, acceptanceWeighting);    
       }  
  
 
@@ -362,27 +587,27 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
 
       if(p >= double(lo) && p < double(hi)) { 
 
-        thetaY_vs_time_mod_slices_.at(i_slice)->Fill(g2ModTime, theta_y);
-        thetaY_vs_time_mod_20ns_slices_.at(i_slice)->Fill(g2ModTime, theta_y);
-        thetaY_vs_time_mod_50ns_slices_.at(i_slice)->Fill(g2ModTime, theta_y);
+        thetaY_vs_time_mod_slices_.at(i_slice)->Fill(g2ModTime, theta_y, acceptanceWeighting);
+        thetaY_vs_time_mod_20ns_slices_.at(i_slice)->Fill(g2ModTime, theta_y, acceptanceWeighting);
+        thetaY_vs_time_mod_50ns_slices_.at(i_slice)->Fill(g2ModTime, theta_y, acceptanceWeighting);
       
         if(time > 8*g2Period) {
-          thetaY_vs_time_mod_long_slices_.at(i_slice)->Fill(longModTime, theta_y);
-          thetaY_vs_time_mod_long_20ns_slices_.at(i_slice)->Fill(longModTime, theta_y);
-          thetaY_vs_time_mod_long_50ns_slices_.at(i_slice)->Fill(longModTime, theta_y);    
+          thetaY_vs_time_mod_long_slices_.at(i_slice)->Fill(longModTime, theta_y, acceptanceWeighting);
+          thetaY_vs_time_mod_long_20ns_slices_.at(i_slice)->Fill(longModTime, theta_y, acceptanceWeighting);
+          thetaY_vs_time_mod_long_50ns_slices_.at(i_slice)->Fill(longModTime, theta_y, acceptanceWeighting);    
         }  
 
         // Other scans 
-        thetaY_mom_slices_.at(i_slice)->Fill(theta_y);
+        thetaY_mom_slices_.at(i_slice)->Fill(theta_y, acceptanceWeighting);
         Y_mom_slices_.at(i_slice)->Fill(y);
         pY_mom_slices_.at(i_slice)->Fill(py);
         p_mom_slices_.at(i_slice)->Fill(p);
+        thetaY_vs_Y_mom_slices_.at(i_slice)->Fill(y, theta_y, acceptanceWeighting);
 
       }
 
     }
  
-
     if(100*float(entry) / nEntries > targetPerc) {
       cout << Form("Processed %.1f%%", 100*float(entry)/nEntries) << endl;
       targetPerc += 10;
@@ -419,6 +644,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
   momX->Write();
   momY->Write();
   momZ->Write();
+  thetaY_vs_Y->Write();
 
    for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) {
 
@@ -434,41 +660,58 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool boost = false, bo
     Y_mom_slices_.at(i_slice)->Write();
     pY_mom_slices_.at(i_slice)->Write();
     p_mom_slices_.at(i_slice)->Write();
+    thetaY_vs_Y_mom_slices_.at(i_slice)->Write();
       
   }
+
+<<<<<<< HEAD
+  verticalOffsetFile->Close();
+=======
+  verticalOffsetCorrectionFile->Close();
+>>>>>>> 61e4c6dfc811565a0487218eb445720b32e0a372
+  acceptanceFile->Close();
 
   return;
 
 }
 
+
 int main(int argc, char *argv[]) {
 
   bool boost = false;
-  bool quality = false; 
+  bool momCuts = true;//false; 
+  bool timeCuts = true; 
 
+  bool verticalOffsetCorr = false;
+  bool acceptanceCorr = false;
+  
   string inFileName = argv[1]; // "/pnfs/GM2/persistent/EDM/MC/dMu/TruthNTup/truthTrees.000.root";//
   string outFileName = argv[2]; //"tmp.root";
+  //string config = argv[3]; // "Run-1a_250MeV_BQ";
+  string stn = argv[3];
 
   string treeName = "phaseAnalyzer/g2phase";
   // Open tree and load branches
-  TFile *fin = TFile::Open(inFileName .c_str());
+  TFile *fin = TFile::Open(inFileName.c_str());
   // Get tree
   TTree *tree = (TTree*)fin->Get(treeName.c_str());
 
   cout<<"\nOpened tree:\t"<<treeName<<" "<<tree<<" from file "<<inFileName<<" "<<fin<<endl;
 
   // Book output
-
   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
-   
-  // Fill histograms
-  Run(tree, fout, quality, boost);
 
-  // Close
+  // Fill histograms
+  // RunNormally(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bool verticalOffsetCorrection, bool acceptanceCorr, string stn) {
+
+  Run(tree, fout, momCuts, timeCuts, boost, verticalOffsetCorr, acceptanceCorr, stn);
+  //RunWithDataDrivenAcceptanceCorrection(tree, fout, config, momCuts, timeCuts, boost, verticalOffsetCorr, acceptanceCorr);
+  
   fout->Close();
   fin->Close();
 
   cout<<"\nDone. Histogram written to:\t"<<outFileName<<" "<<fout<<endl;
-   
+
   return 0;
 }
+

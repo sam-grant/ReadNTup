@@ -12,11 +12,16 @@ fi
 dir="/pnfs/GM2/persistent/EDM/MC/dMu/Trees/ControlSample/TrackReco"
 
 for tree in `ls $dir | sort -V`; do
+
     id=${tree##*truthTrees.}
     id=${id%%.root*}
+
+    echo "Running command ./VerticalOffset.exe ${dir}/${tree} ${config}/plots_${id}.root"
+    ./VerticalOffset.exe ${dir}/${tree} ${config}/plots_${id}.root
     # ./Plotter.exe ${dir}/${tree} ${config}/plots_${id}.root
-    ./Acceptance.exe ${dir}/${tree} ${config}/plots_${id}.root
+    # ./Acceptance.exe ${dir}/${tree} ${config}/plots_${id}.root
     
+
 done
 
 rm -f plots_${config}.root
