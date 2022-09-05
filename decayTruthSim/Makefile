@@ -3,7 +3,7 @@ C++ = g++
 ROOTFLAGS = $(shell root-config --cflags)
 ROOTLIBS  = $(shell root-config --libs)
 
-Target = Plotter.exe Acceptance.exe Count.exe
+Target = Plotter.exe Acceptance.exe Count.exe SanityPlots.exe ThetaYvsMomentum.exe
 
 all:$(Target)
 
@@ -16,5 +16,11 @@ Acceptance.exe: Acceptance.C
 Count.exe: Count.C
 	${C++} -o $@ Count.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
 
+SanityPlots.exe: SanityPlots.C
+	${C++} -o $@ SanityPlots.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
+	
+ThetaYvsMomentum.exe: ThetaYvsMomentum.C
+	${C++} -o $@ ThetaYvsMomentum.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
+	
 clean:
 	rm *exe

@@ -1,8 +1,8 @@
-void DrawTGraphErrors(TGraphErrors *graph, std::string title, std::string fname) {
+void DrawTGraphErrors(TGraphErrors *graph, TString title, TString fname) {
 
 	TCanvas *c = new TCanvas("c","c",800,600);
 
-	graph->SetTitle(title.c_str());
+	graph->SetTitle(title);
 	graph->GetXaxis()->SetTitleSize(.04);
 	graph->GetYaxis()->SetTitleSize(.04);
 	graph->GetXaxis()->SetTitleOffset(1.1);
@@ -13,9 +13,9 @@ void DrawTGraphErrors(TGraphErrors *graph, std::string title, std::string fname)
 	graph->SetMarkerStyle(20); //  Full circle
 	graph->Draw("ALP");
 
-	c->SaveAs((fname+".pdf").c_str());
-	c->SaveAs((fname+".png").c_str());
-	c->SaveAs((fname+".C").c_str());
+	c->SaveAs(fname+".pdf");
+	c->SaveAs(fname+".png");
+	c->SaveAs(fname+".C");
 
 	delete c;
 
@@ -23,20 +23,29 @@ void DrawTGraphErrors(TGraphErrors *graph, std::string title, std::string fname)
 
 }
 
-void Run(string config) {
+void Run(TString config, TString finName) {
 
-	TFile *fin = TFile::Open(("/pnfs/GM2/persistent/EDM/MC/dMu/Trees/Alignment/"+config+"/trackTruthTrees.1.root").c_str());
+	// /pnfs/GM2/persistent/EDM/MC/dMu/Trees/Alignment/1mm/trackTruthTrees.1.root
+	// /pnfs/GM2/persistent/EDM/MC/dMu/Trees/Summer2022Campaign/sgrant/MainNtuple
+	// /pnfs/GM2/persistent/EDM/MC/dMu/Trees/Summer2022Campaign/sgrant/Plus1mmNtuple
+	// /pnfs/GM2/persistent/EDM/MC/dMu/Trees/Summer2022Campaign/sgrant/Minus1mmNtuple
+	// /pnfs/GM2/persistent/EDM/MC/dMu/Trees/Summer2022Campaign/sgrant/Plus0.1degNtuple
+	// /pnfs/GM2/persistent/EDM/MC/dMu/Trees/Summer2022Campaign/sgrant/Minus0.1degNtuple
 
-	vector<string> stn_ = {"0", "12", "18"};
+	finName = "/pnfs/GM2/persistent/EDM/MC/dMu/Trees/Summer2022Campaign/sgrant/"+config+"/"+finName;
+	if(config=="1mm") finName = "/pnfs/GM2/persistent/EDM/MC/dMu/Trees/Alignment/1mm/trackTruthTrees.1.root";
+
+	TFile *fin = TFile::Open(finName);
+
+	cout<<"---> Opened "<<finName<<", "<<fin<<endl;
+
+	vector<TString> stn_ = {"0", "12", "18"};
 
 	for(auto& stn : stn_) { 
 
+		TGraphErrors *gr1 = (TGraphErrors*)fin->Get("Extrapolation/strawGeometry/strawGeometry_worldCoordsYn_station"+stn);
 
-
-		TGraphErrors *gr1 = (TGraphErrors*)fin->Get(("Extrapolation/strawGeometry/strawGeometry_worldCoordsYn_station"+stn).c_str());
-
-		// Original graph is massive with many duplicate points.
-		// Doing this speeds things up by a factor of 10 at least.
+		// Original graph is massive with many duplicate points, loop through the first lot of points to speed things up
 		TGraphErrors *gr2 = new TGraphErrors();
 
 		for (int i(1); i<9; i++) {
@@ -62,8 +71,11 @@ void Run(string config) {
 
 void AlignmentSanityPlots() { 
 
-	Run("1mm");
-	Run("0mm");
+	Run("1mm", "trackTruthTrees.1.root");
+	Run("Plus1mmNtuple", "gm2tracker_hadd_58466221_1.root");
+	Run("Minus1mmNtuple", "gm2tracker_hadd_58466222_1.root");
+	Run("Plus0.1degNtuple", "gm2tracker_hadd_36355304_1.root");
+	Run("Minus0.1degNtuple", "gm2tracker_hadd_58466326_1.root");
 
 	return; 
 }

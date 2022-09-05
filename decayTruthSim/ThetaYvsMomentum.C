@@ -63,21 +63,7 @@ void Run(TTree *tree, TFile *output, bool timeCuts, bool boost) {
 
   cout<<"---> Booking histograms"<<endl;
 
-  TH1D *p = new TH1D("Momentum", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
-  TH1D *pY = new TH1D("MomentumY", ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
-  TH1D *pX = new TH1D("MomentumX", ";Track momentum X [MeV];Tracks", int(pmax), -pmax*momBoostFactor, pmax*momBoostFactor); 
-  TH1D *pZ = new TH1D("MomentumZ", ";Track momentum Z [MeV];Tracks", int(pmax), -pmax*momBoostFactor, pmax*momBoostFactor); 
-  TH1D *R = new TH1D("R", ";R [mm];Tracks", 120, -60, 60); 
-  TH1D* Y = new TH1D("Y", ";Y [mm];Tracks", 120, -60, 60);
-  TH1D *Phi = new TH1D("Phi", ";Ring azimuthal angle [rad];Tracks", 600, 0, TMath::TwoPi()); 
-  TH2D *decayX_vs_decayZ = new TH2D("DecayX_vs_DecayZ", ";Decay vertex position Z [mm];Decay vertex position X [mm]", 800, -8000, 8000, 800, -8000, 8000);
-  TH2D *decayY_vs_decayR = new TH2D("DecayY_vs_DecayR", ";Decay vertex position R [mm];Decay vertex position Y [mm]", 120, -60, 60, 120, -60, 60);
-  TH1D *thetaY = new TH1D("ThetaY", ";#theta_{y} [mrad];Tracks", 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor); 
-  TH2D *thetaY_vs_t = new TH2D("ThetaY_vs_Time", ";Decay time [#mus]; #theta_{y} [mrad] / 149.2 ns ", 2700, 0, 2700*T_c, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-  TH2D *thetaY_vs_p = new TH2D("ThetaY_vs_Momentum", ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-  TH2D *thetaY_vs_R = new TH2D("ThetaY_vs_R", ";Decay vertex position R [mm]; #theta_{y} [mrad] / mm ", 120, -60, 60, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-  TH2D *thetaY_vs_Y = new TH2D("ThetaY_vs_Y", ";Decay vertex position Y [mm]; #theta_{y} [mrad] / mm ", 120, -60, 60, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-  TH2D *thetaY_vs_Phi = new TH2D("ThetaY_vs_Phi", ";Ring azimuthal angle [rad]; #theta_{y} [mrad] / rad ", 600, 0, TMath::TwoPi(), 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+  TH2D *thetaY_vs_p = new TH2D("ThetaY_vs_Momentum", ";Momentum [MeV]; #theta_{y} [mrad] / 50 MeV ", int(pmax)/50, 0, pmax, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
 
   // Get branches (using header file)
   InitBranches br(tree);
@@ -186,21 +172,7 @@ void Run(TTree *tree, TFile *output, bool timeCuts, bool boost) {
     if(timeCuts && t < g2Period*7) continue; 
 
     // Fill histograms 
-    p->Fill(eMom.Mag());
-    pX->Fill(px);
-    pY->Fill(py);
-    pZ->Fill(pz);
-    R->Fill(r);
-    Y->Fill(y);
-    Phi->Fill(ringAngle);
-    decayX_vs_decayZ->Fill(z, x);
-    decayY_vs_decayR->Fill(r, y);
-    thetaY->Fill(theta_y);
-    thetaY_vs_t->Fill(t, theta_y);
     thetaY_vs_p->Fill(eMom.Mag(), theta_y);
-    thetaY_vs_R->Fill(r, theta_y);
-    thetaY_vs_Y->Fill(y, theta_y);
-    thetaY_vs_Phi->Fill(ringAngle, theta_y);
  
     if(100*float(entry) / nEntries > targetPerc) {
       cout << Form("Processed %.1f%%", 100*float(entry)/nEntries) << endl;
@@ -215,22 +187,7 @@ void Run(TTree *tree, TFile *output, bool timeCuts, bool boost) {
 
   cout<<"---> Writing histograms"<<endl;
 
-  p->Write();
-  pX->Write();
-  pY->Write();
-  pZ->Write();
-  R->Write();
-  Phi->Write();
-  Y->Write();
-  decayX_vs_decayZ->Write();
-  decayY_vs_decayR->Write();
-  thetaY->Write();
-  thetaY_vs_t->Write();
   thetaY_vs_p->Write();
-  thetaY_vs_R->Write();
-  thetaY_vs_Y->Write();
-  thetaY_vs_Phi->Write();
-
 
   return;
 

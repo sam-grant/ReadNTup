@@ -1,10 +1,11 @@
 # Get arguments (sam dataset and number of cores to use)
-if [ "$#" -ne 1 ]; then
-  echo "Number of cores required as argument."
+if [ "$#" -ne 2 ]; then
+  echo "Number of cores and truth required as argument."
   return
 fi
 
 nCores=$1
+truth=$2
 
 config="plots" 
 
@@ -24,18 +25,8 @@ for tree in `ls ${dir} | sort -V`; do
         continue
     fi
 
-    echo "${dir}/${tree}" "${config}/trackerAcceptancePlots.${id}.root"
-    # ./Plotter.exe ${dir}/${tree} ${config}/trackerAcceptancePlots.${id}.root
-    #./PlotterMisalignment.exe ${dir}/${tree} ${config}/trackerAcceptancePlots.${id}.root
-    # break
+    echo "${dir}/${tree}" "${config}/trackerAcceptancePlots.${truth}.${id}.root" "$truth" 
+
 done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
-rm -f trackerAcceptancePlots.root && hadd -f trackerAcceptancePlots.root ${config}/trackerAcceptancePlots.*.root
-
-# dir="/gm2/data/g2be/Production/Trees/Run1" 
-
-# for run in `cat txt/${datasetName}.txt`; do
-  
-#   echo "${dir}/trackRecoTrees_${run}.root" "${datasetName}/trackRecoPlots_${run}.root" $dataset
-  
-# done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
+rm -f trackerAcceptancePlots.${truth}.root && hadd -f trackerAcceptancePlots.${truth}.root ${config}/trackerAcceptancePlots.${truth}.*.root

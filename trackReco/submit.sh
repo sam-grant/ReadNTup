@@ -39,6 +39,8 @@ for run in `cat txt/${datasetName}.txt`; do
   
 done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
-sleep 5
+sleep 2
 
-hadd -f plots_${dataset}.root ${datasetName}/trackRecoPlots_*.root
+hadd -f thetaYvsMomentum_${dataset}_BQ_noVertCorr.root ${datasetName}/trackRecoPlots_*.root
+
+# hadd -f plots_${dataset}.root ${datasetName}/trackRecoPlots_*.root

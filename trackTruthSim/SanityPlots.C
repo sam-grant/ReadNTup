@@ -52,6 +52,9 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
 
   cout<<"---> Booking histograms"<<endl;
 
+  // For direct comp. with decays
+  double boostFactor = 5e3*(1/gmagic);
+
   int n_stn = sizeof(stns)/sizeof(stns[0]);
 
   TH1D *p_[n_stn];
@@ -83,7 +86,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
     decayY_vs_decayR_[i_stn] = new TH2D((stns[i_stn]+"_DecayY_vs_DecayR").c_str(), ";Decay vertex position R [mm];Decay vertex position Y [mm]", 120, -60, 60, 120, -60, 60);
     thetaY_[i_stn] = new TH1D((stns[i_stn]+"_ThetaY").c_str(), ";#theta_{y} [mrad];Tracks", 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic); // a bit approximate 
     thetaY_vs_t_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Time").c_str(), ";Decay time [#mus]; #theta_{y} [mrad] / 149.2 ns ", 2700, 0, 2700*T_c, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
-    thetaY_vs_p_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum").c_str(), ";Momentum [MeV]; #theta_{y} [mrad] / MeV ", int(pmax), 0, pmax, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
+    thetaY_vs_p_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum").c_str(), ";Momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);//int(pmax), 0, pmax, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
     thetaY_vs_R_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_R").c_str(), ";R [mm]; #theta_{y} [mrad] / MeV ", 120, -60, 60, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
     thetaY_vs_Y_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Y").c_str(), ";Y [mm]; #theta_{y} [mrad] / MeV ", 120, -60, 60, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
     thetaY_vs_Phi_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Phi").c_str(), ";Ring azimuthal angle [rad]; #theta_{y} [mrad] / MeV ", 600, 0, TMath::TwoPi(), 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
@@ -107,8 +110,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
     tree->GetEntry(entry);
 
     // Quality variables
-
-	bool hitVol = br.hitVolume;
+	  bool hitVol = br.hitVolume;
     double pVal = br.pValue;
     bool vertexQual = br.passVertexQuality;
 
@@ -159,6 +161,9 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
     // ~1.5% of time, truth vertex just reports zero momentum!? 
     if(eMom.Mag() == 0) continue;
 
+    // Time cut
+    if(t < g2Period*7) continue;
+
     // Fill stations invidually according the station array
     int stn_id = -1;
     if(stn==0) stn_id = 2;
@@ -174,6 +179,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
     pY_[stn_id]->Fill(py);
     pZ_[stn_id]->Fill(pz);
     R_[stn_id]->Fill(r);
+    Y_[stn_id]->Fill(y);
     Phi_[stn_id]->Fill(phi);
     decayX_vs_decayZ_[stn_id]->Fill(z, x);
     decayY_vs_decayR_[stn_id]->Fill(r, y);
@@ -201,6 +207,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
   pZ_[1]->Add(pZ_[3], pZ_[4]);
   R_[1]->Add(R_[3], R_[4]);
   Phi_[1]->Add(Phi_[3], Phi_[4]);
+  Y_[1]->Add(Y_[3], Y_[4]);
   decayX_vs_decayZ_[1]->Add(decayX_vs_decayZ_[3], decayX_vs_decayZ_[4]);
   decayY_vs_decayR_[1]->Add(decayY_vs_decayR_[3], decayY_vs_decayR_[4]);
   thetaY_[1]->Add(thetaY_[3], thetaY_[4]);
@@ -216,6 +223,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
   pZ_[0]->Add(pZ_[1], pZ_[2]);
   R_[0]->Add(R_[1], R_[2]);
   Phi_[0]->Add(Phi_[1], Phi_[2]);
+  Y_[0]->Add(Y_[1], Y_[2]);
   decayX_vs_decayZ_[0]->Add(decayX_vs_decayZ_[1], decayX_vs_decayZ_[2]);
   decayY_vs_decayR_[0]->Add(decayY_vs_decayR_[1], decayY_vs_decayR_[2]);
   thetaY_[0]->Add(thetaY_[1], thetaY_[2]);
@@ -239,12 +247,14 @@ void Run(TTree *tree, TFile *output, bool quality, bool truth) {
 	pZ_[i_stn]->Write();
 	R_[i_stn]->Write();
 	Phi_[i_stn]->Write();
+  Y_[i_stn]->Write();
 	decayX_vs_decayZ_[i_stn]->Write();
 	decayY_vs_decayR_[i_stn]->Write();
 	thetaY_[i_stn]->Write();
 	thetaY_vs_t_[i_stn]->Write();
 	thetaY_vs_p_[i_stn]->Write();
 	thetaY_vs_R_[i_stn]->Write();
+  thetaY_vs_Y_[i_stn]->Write();
 	thetaY_vs_Phi_[i_stn]->Write();
 
   }

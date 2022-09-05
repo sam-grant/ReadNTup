@@ -1,7 +1,7 @@
 void S12_worldYn_1mm()
 {
 //=========Macro generated from canvas: c/c
-//=========  (Mon Feb  7 18:26:10 2022) by ROOT version 6.12/04
+//=========  (Thu Aug 11 09:12:19 2022) by ROOT version 6.12/04
    TCanvas *c = new TCanvas("c", "c",0,0,800,600);
    c->Range(-0.7500001,0.3432076,9.75,0.5235557);
    c->SetFillColor(0);

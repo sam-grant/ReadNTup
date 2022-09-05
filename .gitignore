@@ -6,3 +6,7 @@
 ._*
 *.exe
 attic
+*/attic
+*/Images
+*/*~
+*/*.root
