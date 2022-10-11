@@ -1,6 +1,6 @@
 # Get arguments (sam dataset and number of cores to use)
 if [ "$#" -ne 2 ]; then
-  echo "Number of cores and dataset required as arguments. EG: . submit.sh Run-1a 2 "
+  echo "Dataset and number of and cores required as arguments. EG: . submit.sh Run-1a 2 "
   return
 fi
 
@@ -29,9 +29,11 @@ rm -f ${datasetName}/*.root
 
 fi
 
-echo $datasetName
+# echo $datasetName
 
 dir="/gm2/data/g2be/Production/Trees/Run1" 
+
+echo "Run, Subruns, All fills, Laser fills, Tracks, Quality tracks, Vertices, Quality vertices"
 
 for run in `cat txt/${datasetName}.txt`; do
   
@@ -41,6 +43,10 @@ done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
 sleep 2
 
-hadd -f thetaYvsMomentum_${dataset}_BQ_noVertCorr.root ${datasetName}/trackRecoPlots_*.root
+rm -f edmPlots_${dataset}_250MeV_1000_2500MeV_randomised_BQ.root && hadd -f rm -f edmPlots_${dataset}_250MeV_1000_2500MeV_randomised_BQ.root ${datasetName}/trackRecoPlots_*.root
+
+# hadd -f thetaYvsMomentum_${dataset}_BQ_noVertCorr.root ${datasetName}/trackRecoPlots_*.root
 
 # hadd -f plots_${dataset}.root ${datasetName}/trackRecoPlots_*.root
+
+# hadd -f count_${dataset}.root ${datasetName}/trackRecoPlots_*.root

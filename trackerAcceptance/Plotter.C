@@ -58,13 +58,12 @@ void Run(TTree *treeAllDecays, TTree *treeTracks, TFile *output, bool quality, b
 
   int n_stn = sizeof(stns)/sizeof(stns[0]);
 
-  int y_step = 15; 
+/*  int y_step = 15; 
   int y_nSlices = 6;
 
   int p_step = 250; 
   int p_nSlices = pmax/p_step;
 
-  // theta_y ()
   int thetaY_nBins = 630;// 1260;
   double thetaY_min = -1575;
   double thetaY_max = 1575;
@@ -74,6 +73,29 @@ void Run(TTree *treeAllDecays, TTree *treeTracks, TFile *output, bool quality, b
   double y_max = 60;
 
   int r_nBins = 24;//48;
+  double r_min = -60;
+  double r_max = 60;
+
+  int phi_nBins = 125;//48;
+  double phi_min = 0;
+  double phi_max = TMath::TwoPi();*/
+
+  // Fine bins
+  int y_step = 15; 
+  int y_nSlices = 6;
+
+  int p_step = 250; 
+  int p_nSlices = pmax/p_step;
+
+  int thetaY_nBins = 200;// 1260;
+  double thetaY_min = -100;
+  double thetaY_max = 100;
+
+  int y_nBins = 120;//24;//48;
+  double y_min = -60;
+  double y_max = 60;
+
+  int r_nBins = 120;//48;
   double r_min = -60;
   double r_max = 60;
 

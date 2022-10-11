@@ -29,4 +29,4 @@ for tree in `ls ${dir} | sort -V`; do
 
 done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
-rm -f trackerAcceptancePlots.${truth}.root && hadd -f trackerAcceptancePlots.${truth}.root ${config}/trackerAcceptancePlots.${truth}.*.root
+rm -f trackerAcceptancePlots.${truth}.fine.root && hadd -f trackerAcceptancePlots.${truth}.fine.root ${config}/trackerAcceptancePlots.${truth}.*.root

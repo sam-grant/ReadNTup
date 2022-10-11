@@ -1,17 +1,23 @@
 input=$1
 output=$2
-truth=$3
-dataset=$4 
+dataset=$3 
 
 
-echo "Dataset ${dataset}"
-echo "Input ${input}"
-echo "Output ${output}"
+# echo "Dataset ${dataset}"
+# echo "Input ${input}"
+# echo "Output ${output}"
 
 # echo "Command: ./ThetaYvsMomentum.exe $input $output $dataset"
 # ./ThetaYvsMomentum.exe $input $output $dataset
-echo "Command: ./Plotter.exe $input $output $truth $dataset"
-./Plotter.exe $input $output $truth $dataset
+
+echo "Command: ./Plotter.exe $input $output $dataset"
+./Plotter.exe $input $output $dataset
+
+# echo "Command: ./CountFills.exe $input"
+# ./CountEverything.exe $input
+# echo "Command: ./Count.exe $input $output $dataset"
+# ./Count.exe $input $output $dataset
+
 # echo "Command: ./Acceptance.exe $input $output $dataset"
 #echo "Command: ./VerticalOffset.exe $input $output $dataset"
 #./Plotter.exe $input $output $dataset

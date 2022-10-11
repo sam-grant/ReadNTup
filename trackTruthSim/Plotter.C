@@ -61,20 +61,7 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-double GetWeighting(TH1D *hist, double theta_y) {
-
-  int i = hist->GetXaxis()->FindBin(theta_y);
-
-  double weighting = hist->GetBinContent(i);
-
-  //cout<<weighting<<endl;
-
-  if(weighting>1) return 1.0;
-  else return weighting;
-
-}
-
-void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, bool momCuts = true, bool truth = true, bool verticalOffsetCorrection = false, bool acceptanceCorrection = false, string dataset = "Run-1a") {
+void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, bool momCuts = true, bool truth = true, bool verticalOffsetCorrection = false) {
 
   // Get correction histogram
   TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_";
@@ -89,17 +76,6 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
 
   // Book holder for vertical offset histograms 
   vector<TH1D*> verticalOffsetHists_;
-
-  // Acceptance correction (always use reco, we need to include track resolution in this case)
-  string acceptanceFileName = "correctionHists/verticalAngleMomentumSlices.reco."+dataset+".root"; 
-  // "correctionHists/verticalAngleMomentumSlices.truth."+dataset+".root";
-  //if(!truth) acceptanceFileName = "correctionHists/verticalAngleMomentumSlices.reco."+dataset+".root";
-
-  TFile *acceptanceFile = TFile::Open(acceptanceFileName.c_str());
-
-  cout<<"---> Got acceptance correction file "<<acceptanceFileName<<", "<<acceptanceFile<<endl;
-
-  vector<vector<TH1D*>> acceptanceHists_;
 
   // Set the number of periods for the longer modulo plots
   int moduloMultiple = 4; 
@@ -118,6 +94,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
   TH1D *momZ_[n_stn];
   TH2D *decayX_vs_decayZ_[n_stn];
   TH1D *wiggle_[n_stn];
+  TH1D *wiggle_mod_2_[n_stn];
   TH1D *wiggle_mod_[n_stn];
   TH1D *wiggle_mod_long_[n_stn];
   TH1D *thetaY_[n_stn];
@@ -136,8 +113,9 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
   vector<TH1D*> Y_mom_slices_[n_stn];
   vector<TH1D*> pY_mom_slices_[n_stn];
   vector<TH1D*> p_mom_slices_[n_stn];
+  vector<TH1D*> wiggle_mod_mom_slices_[n_stn];
 
-  // Momentum scans of theta_t modulo 
+  // Momentum intervals of theta_t modulo 
   vector<TH2D*> thetaY_vs_time_mod_slices_[n_stn];
   vector<TH2D*> thetaY_vs_time_mod_20ns_slices_[n_stn];
   vector<TH2D*> thetaY_vs_time_mod_50ns_slices_[n_stn];
@@ -151,8 +129,6 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
 
   for (int i_stn = 0; i_stn < n_stn; i_stn++) { 
 
-    vector<TH1D*> acceptanceHistsStn_;
-
     TH1D *verticalOffsetHist = (TH1D*)verticalOffsetCorrectionFile->Get(("VerticalOffsetHists/"+stns[i_stn]+"_ThetaY_vs_p").c_str());
     verticalOffsetHists_.push_back(verticalOffsetHist);
 
@@ -162,6 +138,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
     momZ_[i_stn] = new TH1D((stns[i_stn]+"_MomentumZ").c_str(), ";Track momentum Z [MeV];Tracks", int(pmax), -pmax, pmax); 
     decayX_vs_decayZ_[i_stn] = new TH2D((stns[i_stn]+"_DecayX_vs_DecayZ").c_str(), ";Decay vertex position Z [mm];Decay vertex position X [mm]", 800, -8000, 8000, 800, -8000, 8000);
     wiggle_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle").c_str(), ";Decay time [#mus];Tracks", 2700, 0, 2700*T_c);
+    wiggle_mod_2_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo_2").c_str(), ";t_{g#minus2}^{mod} [#mus];Tracks / 149.2 ns", 29, 0, g2Period); // in ana mom range
     wiggle_mod_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo").c_str(), ";t_{g#minus2}^{mod} [#mus];Tracks / 149.2 ns", 29, 0, g2Period); 
     wiggle_mod_long_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo_Long").c_str(), ";Time modulo [#mus];Tracks / 149.2 ns", 41*moduloMultiple, 0, g2Period*moduloMultiple); 
     thetaY_[i_stn] = new TH1D((stns[i_stn]+"_ThetaY").c_str(), ";#theta_{y} [mrad];Tracks", 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
@@ -190,6 +167,9 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
       TH1D *h_Y_mom_slice = new TH1D((stns[i_stn]+"_Y_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";Vertical decay position [mm];Tracks",  180, -60, 60);
       Y_mom_slices_[i_stn].push_back(h_Y_mom_slice);
 
+      TH1D *h_wiggle_mod_mom_slice = new TH1D((stns[i_stn]+"_Wiggle_Modulo_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";t_{g#minus2}^{mod} [#mus];Tracks / 149.2 ns", 29, 0, g2Period); // in ana mom range
+      wiggle_mod_mom_slices_[i_stn].push_back(h_wiggle_mod_mom_slice);
+
       TH2D *h_thetaY_vs_time_mod_slice = new TH2D((stns[i_stn]+"_ThetaY_vs_Time_Modulo_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad] / 149.2 ns", 29, 0, g2Period, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
       thetaY_vs_time_mod_slices_[i_stn].push_back(h_thetaY_vs_time_mod_slice);
 
@@ -211,13 +191,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
       TH1D *h_thetaY_mom_slice = new TH1D((stns[i_stn]+"_ThetaY_"+std::to_string(lo)+"_"+std::to_string(hi)).c_str(), ";#theta_{y} [mrad];Tracks",  500, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
       thetaY_mom_slices_[i_stn].push_back(h_thetaY_mom_slice);
 
-      // Only has S12S18 S12 S18
-      TH1D *h_ratio = (TH1D*)acceptanceFile->Get(("ratios/"+stns[i_stn]+"_h_ratio_"+to_string(i_slice)).c_str());
-      acceptanceHistsStn_.push_back(h_ratio);
-
     }
-
-    acceptanceHists_.push_back(acceptanceHistsStn_);
 
   }
 
@@ -319,43 +293,6 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
       
     }
 
-    double weighting = 1;
-
-    if(acceptanceCorrection) {
-
-      int i_stn = -1; // no stn 0 for data derived histograms 
-      if(stn==0) i_stn = 2; // should have nothing in it
-      else if(stn==12) i_stn = 3;
-      else if(stn==18) i_stn = 4;
-
-      vector<TH1D*> acceptanceHistsStn_ = acceptanceHists_.at(i_stn);
-
-      // Slice momentum 
-      for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
-
-        int lo = 0 + i_slice*step; 
-        int hi = step + i_slice*step;
-
-        if(p >= double(lo) && p < double(hi)) { 
-
-          //for(auto& a : acceptanceHistsStn_) cout<<a<<endl;
-
-          TH1D *acceptanceHist = acceptanceHistsStn_.at(i_slice);
-
-          if(acceptanceHist!=0) {
-
-            weighting = GetWeighting(acceptanceHist, theta_y);
-
-            // cout<<"---> Weighting "<<weighting<<endl;
-
-          }
-
-         // cout<<"---> Got acceptance hist "<<acceptanceHist<<endl;
-
-        }
-      }
-    }
-
     decayX_vs_decayZ_[stn_id]->Fill(z, x);
 
     // g-2 cuts. See Fienberg thesis figure 2.10
@@ -373,34 +310,36 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
     if( momCuts && p > pLo && p < pHi) { 
 
       momentum_[stn_id]->Fill(p);
-      thetaY_[stn_id]->Fill(theta_y, weighting);
-      thetaY_vs_time_[stn_id]->Fill(time, theta_y, weighting);
-      thetaY_vs_time_20ns_[stn_id]->Fill(time, theta_y, weighting);
-      thetaY_vs_time_50ns_[stn_id]->Fill(time, theta_y, weighting);
-      thetaY_vs_time_mod_[stn_id]->Fill(g2ModTime, theta_y, weighting);
-      thetaY_vs_time_mod_50ns_[stn_id]->Fill(g2ModTime, theta_y, weighting);
+      thetaY_[stn_id]->Fill(theta_y);
+      wiggle_mod_2_[stn_id]->Fill(g2ModTime);
+      thetaY_vs_time_[stn_id]->Fill(time, theta_y);
+      thetaY_vs_time_20ns_[stn_id]->Fill(time, theta_y);
+      thetaY_vs_time_50ns_[stn_id]->Fill(time, theta_y);
+      thetaY_vs_time_mod_[stn_id]->Fill(g2ModTime, theta_y);
+      thetaY_vs_time_mod_50ns_[stn_id]->Fill(g2ModTime, theta_y);
 
       if(time > 8*g2Period) {
-        thetaY_vs_time_mod_long_[stn_id]->Fill(longModTime, theta_y, weighting);
-        thetaY_vs_time_mod_long_20ns_[stn_id]->Fill(longModTime, theta_y, weighting); 
-        thetaY_vs_time_mod_long_50ns_[stn_id]->Fill(longModTime, theta_y, weighting);    
+        thetaY_vs_time_mod_long_[stn_id]->Fill(longModTime, theta_y);
+        thetaY_vs_time_mod_long_20ns_[stn_id]->Fill(longModTime, theta_y); 
+        thetaY_vs_time_mod_long_50ns_[stn_id]->Fill(longModTime, theta_y);    
       }  
 
     } else if(!momCuts) { 
 
       momentum_[stn_id]->Fill(p);
-      thetaY_[stn_id]->Fill(theta_y, weighting);
-      thetaY_vs_time_[stn_id]->Fill(time, theta_y, weighting);
-      thetaY_vs_time_20ns_[stn_id]->Fill(time, theta_y, weighting);
-      thetaY_vs_time_50ns_[stn_id]->Fill(time, theta_y, weighting);
-      thetaY_vs_time_mod_[stn_id]->Fill(g2ModTime, theta_y, weighting);
-      thetaY_vs_time_mod_20ns_[stn_id]->Fill(g2ModTime, theta_y, weighting);
-      thetaY_vs_time_mod_50ns_[stn_id]->Fill(g2ModTime, theta_y, weighting);
+      thetaY_[stn_id]->Fill(theta_y);
+      wiggle_mod_2_[stn_id]->Fill(g2ModTime);
+      thetaY_vs_time_[stn_id]->Fill(time, theta_y);
+      thetaY_vs_time_20ns_[stn_id]->Fill(time, theta_y);
+      thetaY_vs_time_50ns_[stn_id]->Fill(time, theta_y);
+      thetaY_vs_time_mod_[stn_id]->Fill(g2ModTime, theta_y);
+      thetaY_vs_time_mod_20ns_[stn_id]->Fill(g2ModTime, theta_y);
+      thetaY_vs_time_mod_50ns_[stn_id]->Fill(g2ModTime, theta_y);
 
       if(time > 8*g2Period) {
-        thetaY_vs_time_mod_long_[stn_id]->Fill(longModTime, theta_y, weighting);
-        thetaY_vs_time_mod_long_20ns_[stn_id]->Fill(longModTime, theta_y, weighting);
-        thetaY_vs_time_mod_long_50ns_[stn_id]->Fill(longModTime, theta_y, weighting);    
+        thetaY_vs_time_mod_long_[stn_id]->Fill(longModTime, theta_y);
+        thetaY_vs_time_mod_long_20ns_[stn_id]->Fill(longModTime, theta_y);
+        thetaY_vs_time_mod_long_50ns_[stn_id]->Fill(longModTime, theta_y);    
       }  
 
     }
@@ -413,18 +352,19 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
 
       if(p >= double(lo) && p < double(hi)) { 
 
-        thetaY_vs_time_mod_slices_[stn_id].at(i_slice)->Fill(g2ModTime, theta_y, weighting);
-        thetaY_vs_time_mod_20ns_slices_[stn_id].at(i_slice)->Fill(g2ModTime, theta_y, weighting);
-        thetaY_vs_time_mod_50ns_slices_[stn_id].at(i_slice)->Fill(g2ModTime, theta_y, weighting);
+        wiggle_mod_mom_slices_[stn_id].at(i_slice)->Fill(g2ModTime);
+        thetaY_vs_time_mod_slices_[stn_id].at(i_slice)->Fill(g2ModTime, theta_y);
+        thetaY_vs_time_mod_20ns_slices_[stn_id].at(i_slice)->Fill(g2ModTime, theta_y);
+        thetaY_vs_time_mod_50ns_slices_[stn_id].at(i_slice)->Fill(g2ModTime, theta_y);
       
         if(time > 8*g2Period) {
-          thetaY_vs_time_mod_long_slices_[stn_id].at(i_slice)->Fill(longModTime, theta_y, weighting);
-          thetaY_vs_time_mod_long_20ns_slices_[stn_id].at(i_slice)->Fill(longModTime, theta_y, weighting);
-          thetaY_vs_time_mod_long_50ns_slices_[stn_id].at(i_slice)->Fill(longModTime, theta_y, weighting);    
+          thetaY_vs_time_mod_long_slices_[stn_id].at(i_slice)->Fill(longModTime, theta_y);
+          thetaY_vs_time_mod_long_20ns_slices_[stn_id].at(i_slice)->Fill(longModTime, theta_y);
+          thetaY_vs_time_mod_long_50ns_slices_[stn_id].at(i_slice)->Fill(longModTime, theta_y);    
         }  
 
         // Other scans 
-        thetaY_mom_slices_[stn_id].at(i_slice)->Fill(theta_y, weighting);
+        thetaY_mom_slices_[stn_id].at(i_slice)->Fill(theta_y);
         Y_mom_slices_[stn_id].at(i_slice)->Fill(y);
         pY_mom_slices_[stn_id].at(i_slice)->Fill(py);
         p_mom_slices_[stn_id].at(i_slice)->Fill(p);
@@ -446,6 +386,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
   // Combine stations S12&S18
   momentum_[1]->Add(momentum_[3], momentum_[4]);
   wiggle_[1]->Add(wiggle_[3], wiggle_[4]);
+  wiggle_mod_2_[1]->Add(wiggle_mod_2_[3], wiggle_mod_2_[4]);
   wiggle_mod_[1]->Add(wiggle_mod_[3], wiggle_mod_[4]);
   wiggle_mod_long_[1]->Add(wiggle_mod_long_[3], wiggle_mod_long_[4]);
   thetaY_[1]->Add(thetaY_[3], thetaY_[4]);
@@ -465,6 +406,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
 
    for ( int i_slice(0); i_slice < nSlices; i_slice++ ) {
 
+      wiggle_mod_mom_slices_[1].at(i_slice)->Add(wiggle_mod_mom_slices_[3].at(i_slice), wiggle_mod_mom_slices_[4].at(i_slice));
       thetaY_vs_time_mod_slices_[1].at(i_slice)->Add(thetaY_vs_time_mod_slices_[3].at(i_slice), thetaY_vs_time_mod_slices_[4].at(i_slice));
       thetaY_vs_time_mod_20ns_slices_[1].at(i_slice)->Add(thetaY_vs_time_mod_20ns_slices_[3].at(i_slice), thetaY_vs_time_mod_20ns_slices_[4].at(i_slice));
       thetaY_vs_time_mod_50ns_slices_[1].at(i_slice)->Add(thetaY_vs_time_mod_50ns_slices_[3].at(i_slice), thetaY_vs_time_mod_50ns_slices_[4].at(i_slice));
@@ -482,6 +424,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
   momentum_[0]->Add(momentum_[1], momentum_[2]);
   wiggle_[0]->Add(wiggle_[1], wiggle_[2]);
   wiggle_mod_[0]->Add(wiggle_mod_[1], wiggle_mod_[2]);
+  wiggle_mod_2_[0]->Add(wiggle_mod_2_[1], wiggle_mod_2_[2]);
   wiggle_mod_long_[0]->Add(wiggle_mod_long_[1], wiggle_mod_long_[2]);
   thetaY_[0]->Add(thetaY_[1], thetaY_[2]);
   thetaY_vs_time_[0]->Add(thetaY_vs_time_[1], thetaY_vs_time_[2]);
@@ -500,6 +443,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
 
    for ( int i_slice(0); i_slice < nSlices; i_slice++ ) {
 
+      wiggle_mod_mom_slices_[0].at(i_slice)->Add(wiggle_mod_mom_slices_[1].at(i_slice), wiggle_mod_mom_slices_[2].at(i_slice));
       thetaY_vs_time_mod_slices_[0].at(i_slice)->Add(thetaY_vs_time_mod_slices_[1].at(i_slice), thetaY_vs_time_mod_slices_[2].at(i_slice));
       thetaY_vs_time_mod_20ns_slices_[0].at(i_slice)->Add(thetaY_vs_time_mod_20ns_slices_[1].at(i_slice), thetaY_vs_time_mod_20ns_slices_[2].at(i_slice));
       thetaY_vs_time_mod_50ns_slices_[0].at(i_slice)->Add(thetaY_vs_time_mod_50ns_slices_[1].at(i_slice), thetaY_vs_time_mod_50ns_slices_[2].at(i_slice));
@@ -526,6 +470,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
     momentum_[i_stn]->Write();
     wiggle_[i_stn]->Write();
     wiggle_mod_[i_stn]->Write();
+    wiggle_mod_2_[i_stn]->Write();
     wiggle_mod_long_[i_stn]->Write();
     thetaY_[i_stn]->Write();
     thetaY_vs_time_[i_stn]->Write();
@@ -546,6 +491,7 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
 
       output->cd("MomentumBinnedAnalysis"); 
 
+      wiggle_mod_mom_slices_[i_stn].at(i_slice)->Write();
       thetaY_vs_time_mod_slices_[i_stn].at(i_slice)->Write();
       thetaY_vs_time_mod_20ns_slices_[i_stn].at(i_slice)->Write();
       thetaY_vs_time_mod_50ns_slices_[i_stn].at(i_slice)->Write();
@@ -564,25 +510,22 @@ void Run(TTree *tree, TFile *output, bool quality = true, bool timeCuts = true, 
   cout<<"---> Written plots"<<endl;
 
   verticalOffsetCorrectionFile->Close();
-  acceptanceFile->Close();
 
   return;
 
 }
-
+ 
 int main(int argc, char *argv[]) {
 
   bool quality = true;
   bool timeCuts = true;
   bool momCuts = true;
   bool truth = true;
-  bool verticalOffsetCorrection = false; 
-  bool acceptanceCorrection = true; 
+  bool verticalOffsetCorrection = false;
 
   string inFileName = argv[1]; 
   string outFileName = argv[2];
   string truthStr = argv[3];
-  string dataset = argv[4];
 
   if(truthStr=="Truth") truth = true;
   else if(truthStr=="Reco") truth = false;
@@ -601,7 +544,7 @@ int main(int argc, char *argv[]) {
   TFile *fout = new TFile(outFileName.c_str(), "RECREATE");
    
   // Fill histograms
-  Run(tree, fout, quality, timeCuts, momCuts, truth, verticalOffsetCorrection, acceptanceCorrection, dataset);
+  Run(tree, fout, quality, timeCuts, momCuts, truth, verticalOffsetCorrection);
 
   // Close
   fout->Close();

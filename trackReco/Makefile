@@ -3,7 +3,7 @@ C++ = g++
 ROOTFLAGS = $(shell root-config --cflags)
 ROOTLIBS  = $(shell root-config --libs)
 
-Target = Plotter.exe FastRotation.exe VerticalOffset.exe VerticalOffsetVsTime.exe OrthogonalPlotter.exe test.exe MomentumDist.exe Acceptance.exe PlotVerticalPosition.exe Count.exe ThetaYvsMomentum.exe
+Target = Plotter.exe FastRotation.exe VerticalOffset.exe VerticalOffsetVsTime.exe OrthogonalPlotter.exe test.exe MomentumDist.exe Acceptance.exe PlotVerticalPosition.exe Count.exe ThetaYvsMomentum.exe CountEverything.exe
 
 all:$(Target)
 
@@ -39,6 +39,9 @@ VerticalOffsetVsTime.exe: VerticalOffsetVsTime.C
 
 ThetaYvsMomentum.exe: ThetaYvsMomentum.C 
 	${C++} -o $@ ThetaYvsMomentum.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
+
+CountEverything.exe: CountEverything.C
+	${C++} -o $@ CountEverything.C $(Objects) $(ROOTFLAGS) $(ROOTLIBS)
 
 clean:
 	rm *exe

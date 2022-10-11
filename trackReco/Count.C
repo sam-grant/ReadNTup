@@ -56,10 +56,12 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a") {
 
     tree->GetEntry(entry);
 
+    if(br.inFillLaserCount>0) continue;
+    
     TVector3 eMom(br.decayVertexMomX, -br.decayVertexMomY, br.decayVertexMomZ); 
 
-    // Not sure why this would happen?
-//    if(eMom.Mag() <= 0) continue;
+    // I think this can happen if you have a laser fill
+    if(eMom.Mag() <= 0) continue; 
 
     momentum_raw->Fill(eMom.Mag());
     if(br.passTrackQuality) momentum_qualityTracks->Fill(eMom.Mag());

@@ -31,10 +31,11 @@ double pLo = 1000;
 double pHi = 2500;
 
 //double n = 0.108; // Run-1a / Run-1d
-//double n = 0.120; // Run-1b / Run-1c
-double f_c = 6.7024; // MHz
-//double T_y = 1/(f_c*sqrt(n)); 
-//double T_x = 1/(f_c - (f_c*sqrt(1-n)));
+double n = 0.120; // Run-1b / Run-1c
+
+double f_c = 6.71; // MHz
+double T_y = 1/(f_c*sqrt(n)); 
+double T_x = 1/(f_c - (f_c*sqrt(1-n)));
 
 TTree *InitTree(string fileName, string treeName) { 
 
@@ -66,7 +67,7 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-double RandomisedTimeVB(TRandom3 *rand, double time, string ds) {
+double RandomisedTimeVBO(TRandom3 *rand, double time, string ds) {
 
   double n;
   if(ds=="Run-1a" || ds=="Run-1d") n = 0.108; // Run-1a / Run-1d
@@ -264,13 +265,11 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
     tree->GetEntry(entry);
 
-    // quality variables
     double time = br.decayTime * 1e-3; // ns -> us
 
     if(timeRandomisation) {
       time = RandomisedTime(rand, time); // randomise out the FR
-      time = RandomisedTimeVB(rand, time, dataset); // randomise out the VB
-      //time = RandomisedTimeHB(rand, time); // randomise out the HB (only for EG)
+      time = RandomisedTimeVBO(rand, time, dataset); // randomise out the VB0
     }
 
     double x = br.decayVertexPosX; double y = br.decayVertexPosY; double z = br.decayVertexPosZ; 
@@ -345,7 +344,8 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
     }  
 
-    // I don't actually use any of the acceptance stuff
+    // I don't actually use any of the acceptance stuff in data! 
+/*    
     if(acceptanceCorr) {
 
       //double new_theta_y = AcceptanceWeightedAngle(acceptanceHist, theta_y, y);
@@ -397,7 +397,7 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
 
       }
 
-    }
+    }*/
 
     decayZ_vs_decayX_[stn_id]->Fill(x, z);
  
@@ -575,12 +575,13 @@ int main(int argc, char *argv[]) {
 
    bool quality = true;
    bool timeRandomisation = true;
-   bool verticalOffsetCorrection = false;//true;
+   bool verticalOffsetCorrection = true;
    bool acceptanceCorrection = false;
 
    string inFileName = argv[1]; 
    string outFileName = argv[2]; 
    string dataset = argv[3];
+   
 /*
    string inFileName = "/gm2/data/g2be/Production/Trees/Run1/trackRecoTrees_15921.root";
    string outFileName = "trackRecoPlots_15921_test.root";
