@@ -2,7 +2,7 @@
 
 **The purpose of this repository is the read in data/simulation in the form of ROOT Ntuples and output analysis level histograms.** 
 
-- The core of each directory is a Plotter.C, a Plotter.h, a Makefile, and submit.sh/run.sh scripts. 
+- The core of each directory is a `Plotter.C`, a `Plotter.h`, a `Makefile`, and `submit.sh`/`run.sh` scripts. 
 
 - Data is read in by **trackReco**. 
 
