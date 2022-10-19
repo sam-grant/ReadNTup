@@ -79,6 +79,10 @@ double RandomisedTimeVBO(TRandom3 *rand, double time, string ds) {
   return rand->Uniform(time-T_y/2, time+T_y/2);
 }
 
+/*
+
+This is all wrong 
+
 double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double theta_y, double y) { 
 
   // Get coordinates
@@ -116,7 +120,7 @@ double AcceptanceWeightedAngleWithInterpolation(TH2D *map1, TH2D *map2, double t
   return theta_y * (1/weighting);
 
 
-}
+}*/
 
 void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true, bool timeRandomisation=true, bool verticalOffsetCorrection=false, bool acceptanceCorr=false) {
 
@@ -591,6 +595,7 @@ int main(int argc, char *argv[]) {
 
    // Open tree and load branches
    TFile *fin = TFile::Open(inFileName .c_str());
+   
    // Get tree
    TTree *tree = (TTree*)fin->Get(treeName.c_str());
 
