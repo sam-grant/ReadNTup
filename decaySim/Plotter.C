@@ -9,10 +9,12 @@ Output format (defined in submit.sh): edmPlots_<refFrame>_<recoType>_<binWidth>_
 recoType: allDecays
 refFrame: LAB (lab frame) or MRF (muon rest frame)
 binWidth: 250MeV (settled for Run-1)
-qualityInfo: noQ (no beam vertex quality cuts) or Q () 
+qualityInfo: noQ (no beam vertex quality cuts) or Q (beam vertex quality cuts) 
 corrInfo: randCorr_vertCorr_accWeight (time randomsiation, vertical angle offset correction, acceptance weighting -- left blank for no corrections) 
 
-Note: for Run-1 we only perform acceptance weighting on allDecays.
+Notes: 
+  * For Run-1 we only perform acceptance weighting on allDecays;
+  * No vertical angle correction needed for allDecays.
 
 */
 
@@ -97,7 +99,7 @@ double AcceptanceWeighting(TGraph2D *map, double y, double theta_y) {
 }
 
 // Run plotting
-void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bool verticalOffsetCorrection, bool acceptanceCorr, string stn) {
+void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bool randCorr, bool vertCorr, bool accWeight, string stn) {
 
   // Get vertical offset correction histograms 
   // THIS NEED TO BE REGENERATED AND UPDATED 
@@ -129,6 +131,7 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
 
   cout<<"---> Booking histograms"<<endl;
 
+  TH1D *momentum_raw = new TH1D("Momentum_Raw", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); // Prior to any cuts
   TH1D *momentum = new TH1D("Momentum", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
   TH1D *momY = new TH1D("MomentumY", ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
   TH2D *decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
@@ -206,7 +209,7 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
 
     // Get variables
     double time = br.posiInitTime * 1e-3; // us
-    time = RandomisedTime(rand, time); // randomise out the FR
+    if(randCorr) time = RandomisedTime(rand, time); // randomise out the FR
 
     // Positron world momentum 
     TVector3 eMom(br.posiInitPX, br.posiInitPY, br.posiInitPZ); 
@@ -275,15 +278,17 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
     // Convert from rad to mrad 
     theta_y = theta_y * 1e3;
 
+    momentum_raw->Fill(p);
+
     // Correct offset (no time dependance here)
-    if(verticalOffsetCorrection) {
+    if(vertCorr) {
       double theta_y_offset = verticalOffsetHist->GetBinContent(verticalOffsetHist->FindBin(p));
       theta_y = theta_y - theta_y_offset;
     }
     
     // Obtain acceptance weight for this theta_y 
     double acceptanceWeighting = 1.0;
-    if(acceptanceCorr) {
+    if(accWeight) {
       
       // Slice momentum 
       for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
@@ -375,6 +380,7 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   output->cd("SimultaneousAnalysis");
 
   // Write histograms
+  momentum_raw->Write();
   momentum->Write();
   wiggle->Write();
   wiggle_mod->Write();
@@ -419,6 +425,7 @@ int main(int argc, char *argv[]) {
   bool boost = false;
   bool momCuts = true; 
   bool timeCuts = true; 
+  bool randCorr = true; // FR
   bool vertCorr = false;
   bool accWeight = false; 
 
@@ -437,7 +444,7 @@ int main(int argc, char *argv[]) {
   TFile *fout = new TFile(outFileName.c_str(),"RECREATE");
 
   // Fill histograms
-  Run(tree, fout, momCuts, timeCuts, boost, vertCorr, accWeight, stn);
+  Run(tree, fout, momCuts, timeCuts, boost, randCorr, vertCorr, accWeight, stn);
   
   // Close files
   fout->Close();
