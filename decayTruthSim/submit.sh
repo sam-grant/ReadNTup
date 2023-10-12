@@ -52,10 +52,12 @@ done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
 # rm -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_accWeight${stn}_full.root && hadd -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_accWeight${stn}_full.root ${config}/plots_*.root
 
-rm -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_full.root && hadd -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_full.root ${config}/plots_*.root
+# rm -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_full.root && hadd -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_full.root ${config}/plots_*.root
 
 # rm -f sanityPlots_allDecays_WORLD_250MeV_AQ_noVertCorr.root && hadd -f sanityPlots_allDecays_WORLD_250MeV_AQ_noVertCorr.root ${config}/plots_*.root
 # rm -f thetaYvsMomentum_allDecays_WORLD_250MeV_AQ_noVertCorr_accWeight${stn}.root && hadd -f thetaYvsMomentums_allDecays_WORLD_250MeV_AQ_noVertCorr.root ${config}/plots_*.root
+
+rm -f thetaYvsMomentum_allDecays_WORLD_250MeV_AQ_noVertCorr.root && hadd -f thetaYvsMomentums_allDecays_WORLD_250MeV_AQ_noVertCorr.root ${config}/plots_*.root
 
 
 # rm -f plots_${config}_${dataset}.root

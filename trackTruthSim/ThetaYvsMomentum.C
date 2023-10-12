@@ -65,6 +65,8 @@ double GetWeighting(TH2D *map, double theta_y, double p) {
 void Run(TTree *tree, TFile *output, bool quality, bool truth, string dataset = "Run-1a") {
 
   // Get weighting file
+  // Why am I weighting anything here, was this a cross check?
+
   string weightingFileName = "correctionHists/thetaYvsMomentum_"+dataset+"_BQ_noVertCorr.root";
   if(dataset=="Run-1d") weightingFileName = "correctionHists/thetaYvsMomentum_"+dataset+"_50usStartTime_BQ_noVertCorr.root";
   
