@@ -38,7 +38,7 @@ Notes:
 using namespace std;
 
 // Constants (updated Oct 2023)
-double omega_a = 1.439337; // This is the unweighted average for FNAL Run-2/3 in rad/us, where the uncertainty is 9.521669287914112e-07 rad/us. Previously used 1.439311 rad/us from BNL. 
+double omega_a = 1.439337; // This is the unweighted average for FNAL Run-2/3 in rad/us, where the uncertainty is 9.521669287914112e-07 rad/us. I used 1.439311 rad/us from BNL in my thesis.
 double g2Period = TMath::TwoPi() / omega_a; // us
 double mMu = 105.6583715; // MeV
 double aMu = 116592059e-11; // This is the combined BNL and FNAL Run-2/3 result. Previously used 116592089e-11 from BNL. 
@@ -127,21 +127,22 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
     momBoostFactor = (1/(2*gmagic));
   }
 
-  // ------ Book histograms -------
+  // Book histograms
 
   cout<<"---> Booking histograms"<<endl;
 
-  TH1D *momentum_raw = new TH1D("Momentum_Raw", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); // Prior to any cuts
-  TH1D *momentum = new TH1D("Momentum", ";Track momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
-  TH1D *momY = new TH1D("MomentumY", ";Track momentum Y [MeV];Tracks", 1000, -60, 60); 
-  TH2D *decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay vertex position X [mm];Decay vertex position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
+  TH1D *momentum_noCuts = new TH1D("Momentum_NoCuts", ";Momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); // Prior to any cuts
+  TH1D *momentum = new TH1D("Momentum", ";Momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
+  TH1D *momY = new TH1D("MomentumY", ";Momentum Y [MeV];Tracks", 1000, -60, 60); 
+  TH2D *decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay position X [mm];Decay position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
   TH1D *wiggle = new TH1D("Wiggle", ";Decay time [#mus];Tracks", 2700, 0, 2700*T_c); // T-method momentum range
-  TH1D *wiggle_mod = new TH1D("Wiggle_Modulo", ";t_{g#minus2}^{mod} [#mus];Tracks / 149.2 ns", 29, 0, g2Period); 
-  TH1D *thetaY = new TH1D("ThetaY", ";#theta_{y} [mrad];Tracks", 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+  TH1D *wiggle_mod = new TH1D("Wiggle_Modulo", ";t_{g#minus2}^{mod} [#mus];Decays / 149.2 ns", 29, 0, g2Period); 
+  TH1D *thetaY = new TH1D("ThetaY", ";#theta_{y} [mrad];Decays", 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time = new TH2D("ThetaY_vs_Time", ";Decay time [#mus]; #theta_{y} [mrad] / 149.2 ns ", 2700, 0, 2700*T_c, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time_mod = new TH2D("ThetaY_vs_Time_Modulo", ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad] / 149.2 ns", 29, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-  TH2D *thetaY_vs_momentum = new TH2D("ThetaY_vs_Momentum", ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_Y = new TH2D("ThetaY_vs_Y", ";Decay y-position [mm];#theta_{y} [mrad]", 24, -60, 60, 40, -100, 100);
+  TH2D *thetaY_vs_momentum_noCuts = new TH2D("ThetaY_vs_Momentum_NoCuts", ";Decay momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+  TH2D *thetaY_vs_momentum = new TH2D("ThetaY_vs_Momentum", ";Decay momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
 
   // Momentum scans
   vector<TH1D*> thetaY_mom_slices_;
@@ -278,7 +279,9 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
     // Convert from rad to mrad 
     theta_y = theta_y * 1e3;
 
-    momentum_raw->Fill(p);
+    // Useful plots to have without cuts
+    momentum_noCuts->Fill(p);
+    thetaY_vs_momentum_noCuts->Fill(p, theta_y);
 
     // Correct offset (no time dependance here)
     if(vertCorr) {
@@ -380,13 +383,14 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   output->cd("SimultaneousAnalysis");
 
   // Write histograms
-  momentum_raw->Write();
+  momentum_noCuts->Write();
   momentum->Write();
   wiggle->Write();
   wiggle_mod->Write();
   thetaY->Write();
   thetaY_vs_time->Write();
   thetaY_vs_momentum->Write();
+  thetaY_vs_momentum_noCuts->Write();
   thetaY_vs_time_mod->Write();
   decayZ_vs_decayX->Write();
   momY->Write();

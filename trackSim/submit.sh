@@ -12,8 +12,8 @@ fi
 
 outDir="output" 
 
-if [ ! -d ${config} ]; then
-    mkdir ${config}
+if [ ! -d ${outDir} ]; then
+    mkdir ${outDir}
 fi
 
 rm -f ${config}/*.root
@@ -35,7 +35,7 @@ for tree in `ls $dir | sort -V`; do
 
 done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
-rm -f edmPlots_track${truthStr}_LAB_250MeV_BQ.root && hadd -f edmPlots_track${truthStr}_LAB_250MeV_BQ.root ${outDir}/plots_*.root
+hadd -f edmPlots_track${truthStr}_LAB_250MeV_BQ_randCorr.root ${outDir}/plots_*.root
 
 # rm -f thetaYvsMomentum_track${truth}_WORLD_250MeV_BQ_noVertCorr_full.root && hadd -f thetaYvsMomentum_track${truth}_WORLD_250MeV_BQ_noVertCorr_full.root ${config}/plots_*.root
 # rm -f edmPlots_track${truth}_WORLD_250MeV_BQ_noVertCorr_full.root && hadd -f edmPlots_track${truth}_WORLD_250MeV_BQ_noVertCorr_full.root ${config}/plots_*.root

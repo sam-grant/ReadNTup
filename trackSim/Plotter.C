@@ -10,7 +10,7 @@ recoType: trackTruth/trackReco
 refFrame: LAB (lab frame) or MRF (muon rest frame)
 binWidth: 250MeV (settled for Run-1)
 qualityInfo: noQ (no beam vertex quality cuts) or Q (beam vertex quality cuts) 
-corrInfo: randCorr_vertCorr(time randomsiation, vertical angle offset correction -- left blank for no corrections) 
+corrInfo: randCorr_vertCorr (time randomsiation, vertical angle offset correction -- left blank for no corrections) 
 
 */
 
@@ -76,7 +76,7 @@ double RandomisedTime(TRandom3 *rand, double time) {
   return rand->Uniform(time-T_c/2, time+T_c/2);
 }
 
-void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, bool truth, bool vertCorr) {
+void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, bool truth, bool randCorr, bool vertCorr) {
 
   // Get vertical offset correction file
   TString verticalOffsetCorrectionFileName = "correctionHists/verticalOffsetHists_";
@@ -215,7 +215,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
 
     }
 
-    time = RandomisedTime(rand, time); // randomise out the FR
+    if(randCorr) time = RandomisedTime(rand, time); // randomise out the FR
 
     bool hitVol = br.hitVolume;
     double pVal = br.pValue;
@@ -428,6 +428,7 @@ int main(int argc, char *argv[]) {
   bool timeCuts = true;
   bool momCuts = true;
   bool truth = true;
+  bool randCorr = true;
   bool vertCorr = false;
 
   string inFileName = argv[1]; 
@@ -452,7 +453,7 @@ int main(int argc, char *argv[]) {
   TFile *fout = new TFile(outFileName.c_str(), "RECREATE");
    
   // Fill histograms
-  Run(tree, fout, quality, timeCuts, momCuts, truth, vertCorr);
+  Run(tree, fout, quality, timeCuts, momCuts, truth, randCorr, vertCorr);
 
   // Close
   fout->Close();
