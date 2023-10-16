@@ -4,73 +4,23 @@ Samuel Grant
 
 Produce N vs t_mod and theta_y vs t_mod histograms for "track truth and track reco". This is the first step in the EDM analysis chain. 
 
-Output format (defined in submit.sh): edmPlots_<refFrame>_<recoType>_<binWidth>_<qualityInfo>_<corrInfo>.root
+Output format (defined in submit.sh): edmPlots_<recoType>_<refFrame>_<binWidth>_<qualityInfo>_<corrInfo>_<alignInfo>.root
 
 recoType: trackTruth/trackReco
 refFrame: LAB (lab frame) or MRF (muon rest frame)
 binWidth: 250MeV (settled for Run-1)
 qualityInfo: noQ (no beam vertex quality cuts) or Q (beam vertex quality cuts) 
 corrInfo: randCorr_vertCorr (time randomsiation, vertical angle offset correction -- left blank for no corrections) 
+alignInfo: plus1mm, minus1mm, plus0.1deg, minus0.1deg
 
 */
 
-#include <iostream>
-#include <vector>
-
+#include "../Common/Utils.h"
 #include "Plotter.h"
-#include "TFile.h"
-#include "TTree.h"
-#include "TTreeReader.h"
-#include "TH1D.h"
-#include "TH2D.h"
-#include "TMath.h"
-#include "TVector3.h"
-#include "TLorentzVector.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "TRandom3.h"
-
-using namespace std;
-
-// Constants (updated Oct 2023)
-double omega_a = 1.439337; // This is the unweighted average for FNAL Run-2/3 in rad/us, where the uncertainty is 9.521669287914112e-07 rad/us. I used 1.439311 rad/us from BNL in my thesis. 
-double g2Period = TMath::TwoPi() / omega_a; // us
-double mMu = 105.6583715; // MeV
-double aMu = 116592059e-11; // This is the combined BNL and FNAL Run-2/3 result. Previously used 116592089e-11 from BNL. 
-double gmagic = std::sqrt( 1.+1./aMu );
-double pmax = 1.01 * mMu * gmagic; 
-double eMass = 0.510999;
-double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
 // Lower and upper momentum analysis cuts.
 double pLo = 1000; 
 double pHi = 2500;
-
-// Open ROOT tree and load branches
-TTree *InitTree(string fileName, string treeName) { 
-
-  // Get file
-  TFile *fin = TFile::Open(fileName.c_str());
-  cout<<"\nOpened tree:\t"<<fileName<<" "<<fin<<endl;
-
-  // Get tree
-  TTree *tree = (TTree*)fin->Get(treeName.c_str());
-
-  cout<<"\nOpened tree:"<<treeName<<" "<<tree<<" from file "<<fileName<<" "<<fin<<endl;
-
-  return tree;
-
-}
-
-double ModTime(double time, int nPeriods = 1) {
-
-  double g2fracTime = time / (nPeriods * g2Period);
-  int g2fracTimeInt = int(g2fracTime);
-  double g2ModTime = (g2fracTime - g2fracTimeInt) * nPeriods * g2Period;
-
-  return g2ModTime;
-
-}
 
 double RandomisedTime(TRandom3 *rand, double time) { 
   return rand->Uniform(time-T_c/2, time+T_c/2);
@@ -111,12 +61,14 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
   TH1D *momY_[n_stn];
   TH2D *decayX_vs_decayZ_[n_stn];
   TH1D *wiggle_[n_stn];
-  TH1D *wiggle_mod_[n_stn];
+  TH1D *wiggle_mod_A_[n_stn]; // Using T-method momentum cut, to obtain phase
+  TH1D *wiggle_mod_B_[n_stn]; // Using EDM momentum cuts, for theta_y fit demoninator 
   TH1D *thetaY_[n_stn];
   TH2D *thetaY_vs_time_[n_stn];
   TH2D *thetaY_vs_time_mod_[n_stn];
-  TH2D *thetaY_vs_momentum_[n_stn];
   TH2D *thetaY_vs_momentum_noCuts_[n_stn];
+  TH2D *thetaY_vs_momentum_vertexCuts_[n_stn];
+  TH2D *thetaY_vs_momentum_allCuts_[n_stn];
 
   // Momentum bins
   vector<TH1D*> thetaY_mom_slices_[n_stn];
@@ -142,13 +94,15 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
     momY_[i_stn] = new TH1D((stns[i_stn]+"_MomentumY").c_str(), ";Decay vertex momentum Y [MeV];Decay vertices", 1000, -60, 60); 
     decayX_vs_decayZ_[i_stn] = new TH2D((stns[i_stn]+"_DecayX_vs_DecayZ").c_str(), ";Decay vertex position Z [mm];Decay vertex position X [mm]", 800, -8000, 8000, 800, -8000, 8000);
     wiggle_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle").c_str(), ";Decay vertex time [#mus];Decay vertices", 2700, 0, 2700*T_c);
-    wiggle_mod_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo").c_str(), ";t_{g#minus2}^{mod} [#mus];Decay vertices / 149.2 ns", 29, 0, g2Period); 
+    wiggle_mod_A_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo_A").c_str(), ";t_{g#minus2}^{mod} [#mus];Decay vertices / 149.2 ns", 29, 0, g2Period); 
+    wiggle_mod_B_[i_stn] = new TH1D((stns[i_stn]+"_Wiggle_Modulo_B").c_str(), ";t_{g#minus2}^{mod} [#mus];Decay vertices / 149.2 ns", 29, 0, g2Period);
     thetaY_[i_stn] = new TH1D((stns[i_stn]+"_ThetaY").c_str(), ";#theta_{y} [mrad];Decay vertices", 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
     thetaY_vs_time_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Time").c_str(), ";Decay time [#mus]; #theta_{y} [mrad] / 149.2 ns ", 2700, 0, 2700*T_c, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
     thetaY_vs_time_mod_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Time_Modulo").c_str(), ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad] / 149.2 ns", 29, 0, g2Period, 1000, -TMath::Pi()*gmagic, TMath::Pi()*gmagic);
-    thetaY_vs_momentum_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum").c_str(), ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-    thetaY_vs_momentum_noCuts_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum_NoCuts").c_str(), ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-    
+    thetaY_vs_momentum_noCuts_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum_NoCuts").c_str(), ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 312, 0, 3120, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+    thetaY_vs_momentum_vertexCuts_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum_VertexCuts").c_str(), ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 312, 0, 3120, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+    thetaY_vs_momentum_allCuts_[i_stn] = new TH2D((stns[i_stn]+"_ThetaY_vs_Momentum_AllCuts").c_str(), ";Decay vertex momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 312, 0, 3120, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+
     // Slice momentum
     for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) { 
 
@@ -263,12 +217,13 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
       theta_y = theta_y - theta_y_offset; 
     }
 
+    thetaY_vs_momentum_vertexCuts_[stn_id]->Fill(p, theta_y);
     decayX_vs_decayZ_[stn_id]->Fill(z, x);
 
     // T-method energy cut. See Fienberg thesis figure 2.10, or ask basically anyone... 
     if(p > 1700  && p < pmax) {
       wiggle_[stn_id]->Fill(time);
-      wiggle_mod_[stn_id]->Fill(g2ModTime);
+      wiggle_mod_A_[stn_id]->Fill(g2ModTime);
     } 
 
     // EDM cuts
@@ -279,7 +234,8 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
       thetaY_[stn_id]->Fill(theta_y);
       thetaY_vs_time_[stn_id]->Fill(time, theta_y);
       thetaY_vs_time_mod_[stn_id]->Fill(g2ModTime, theta_y);
-      thetaY_vs_momentum_[stn_id]->Fill(p, theta_y);
+      thetaY_vs_momentum_allCuts_[stn_id]->Fill(p, theta_y);
+      wiggle_mod_B_[stn_id]->Fill(g2ModTime);
 
     } else if(!momCuts) { 
 
@@ -288,7 +244,8 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
       thetaY_[stn_id]->Fill(theta_y);
       thetaY_vs_time_[stn_id]->Fill(time, theta_y);
       thetaY_vs_time_mod_[stn_id]->Fill(g2ModTime, theta_y);
-      thetaY_vs_momentum_[stn_id]->Fill(p, theta_y);
+      thetaY_vs_momentum_allCuts_[stn_id]->Fill(p, theta_y);
+      wiggle_mod_B_[stn_id]->Fill(g2ModTime);
 
     }
 
@@ -329,14 +286,16 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
   momentum_noCuts_[1]->Add(momentum_noCuts_[3], momentum_noCuts_[4]);
   momentum_[1]->Add(momentum_[3], momentum_[4]);
   wiggle_[1]->Add(wiggle_[3], wiggle_[4]);
-  wiggle_mod_[1]->Add(wiggle_mod_[3], wiggle_mod_[4]);
+  wiggle_mod_A_[1]->Add(wiggle_mod_A_[3], wiggle_mod_A_[4]);
+  wiggle_mod_B_[1]->Add(wiggle_mod_B_[3], wiggle_mod_B_[4]);
   thetaY_[1]->Add(thetaY_[3], thetaY_[4]);
   thetaY_vs_time_[1]->Add(thetaY_vs_time_[3], thetaY_vs_time_[4]);
   thetaY_vs_time_mod_[1]->Add(thetaY_vs_time_mod_[3], thetaY_vs_time_mod_[4]);
   decayX_vs_decayZ_[1]->Add(decayX_vs_decayZ_[4], decayX_vs_decayZ_[4]);
   momY_[1]->Add(momY_[3], momY_[4]);
-  thetaY_vs_momentum_[1]->Add(thetaY_vs_momentum_[3], thetaY_vs_momentum_[4]);
   thetaY_vs_momentum_noCuts_[1]->Add(thetaY_vs_momentum_noCuts_[3], thetaY_vs_momentum_noCuts_[4]);
+  thetaY_vs_momentum_vertexCuts_[1]->Add(thetaY_vs_momentum_vertexCuts_[3], thetaY_vs_momentum_vertexCuts_[4]);
+  thetaY_vs_momentum_allCuts_[1]->Add(thetaY_vs_momentum_allCuts_[3], thetaY_vs_momentum_allCuts_[4]);
 
    for ( int i_slice(0); i_slice < nSlices; i_slice++ ) {
 
@@ -355,14 +314,16 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
   momentum_[0]->Add(momentum_[1], momentum_[2]);
   momentum_noCuts_[0]->Add(momentum_noCuts_[1], momentum_noCuts_[2]);
   wiggle_[0]->Add(wiggle_[1], wiggle_[2]);
-  wiggle_mod_[0]->Add(wiggle_mod_[1], wiggle_mod_[2]);
+  wiggle_mod_A_[0]->Add(wiggle_mod_A_[1], wiggle_mod_A_[2]);
+  wiggle_mod_B_[0]->Add(wiggle_mod_B_[1], wiggle_mod_B_[2]);
   thetaY_[0]->Add(thetaY_[1], thetaY_[2]);
   thetaY_vs_time_[0]->Add(thetaY_vs_time_[1], thetaY_vs_time_[2]);
   thetaY_vs_time_mod_[0]->Add(thetaY_vs_time_mod_[1], thetaY_vs_time_mod_[2]);
   decayX_vs_decayZ_[0]->Add(decayX_vs_decayZ_[1], decayX_vs_decayZ_[2]);
   momY_[0]->Add(momY_[1], momY_[2]);
-  thetaY_vs_momentum_[0]->Add(thetaY_vs_momentum_[1], thetaY_vs_momentum_[2]);
   thetaY_vs_momentum_noCuts_[0]->Add(thetaY_vs_momentum_noCuts_[1], thetaY_vs_momentum_noCuts_[2]);
+  thetaY_vs_momentum_vertexCuts_[0]->Add(thetaY_vs_momentum_vertexCuts_[1], thetaY_vs_momentum_vertexCuts_[2]);
+  thetaY_vs_momentum_allCuts_[0]->Add(thetaY_vs_momentum_allCuts_[1], thetaY_vs_momentum_allCuts_[2]);
 
    for ( int i_slice(0); i_slice < nSlices; i_slice++ ) {
 
@@ -390,14 +351,16 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
     momentum_[i_stn]->Write();
     momentum_noCuts_[i_stn]->Write();
     wiggle_[i_stn]->Write();
-    wiggle_mod_[i_stn]->Write();
+    wiggle_mod_A_[i_stn]->Write();
+    wiggle_mod_B_[i_stn]->Write();
     thetaY_[i_stn]->Write();
     thetaY_vs_time_[i_stn]->Write();
     thetaY_vs_time_mod_[i_stn]->Write();
     decayX_vs_decayZ_[i_stn]->Write();
     momY_[i_stn]->Write();
-    thetaY_vs_momentum_[i_stn]->Write();
     thetaY_vs_momentum_noCuts_[i_stn]->Write();
+    thetaY_vs_momentum_vertexCuts_[i_stn]->Write();
+    thetaY_vs_momentum_allCuts_[i_stn]->Write();
 
    for ( int i_slice = 0; i_slice < nSlices; i_slice++ ) {
 
@@ -422,6 +385,24 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
 
 }
  
+/*
+
+Run test:
+
+./Plotter.out /pnfs/GM2/persistent/EDM/MC/dMu/Trees/TrackRecoAndTruth/5.4e-18/trackSimTrees_00.root output/test.root Truth
+
+Run full:
+
+. submit.sh 3 Truth 
+
+OR 
+
+. submit.sh 4 Truth Plus1mm plus1mm
+
+(modify submit.sh accordingly)
+
+*/
+
 int main(int argc, char *argv[]) {
 
   bool quality = true;

@@ -4,7 +4,7 @@ Samuel Grant
 
 Produce N vs t_mod and theta_y vs t_mod histograms for "all decays". This is the first step in the EDM analysis chain. 
 
-Output format (defined in submit.sh): edmPlots_<refFrame>_<recoType>_<binWidth>_<qualityInfo>_<corrInfo>.root
+Output format (defined in submit.sh): edmPlots_<recoType>_<refFrame>_<binWidth>_<qualityInfo>_<corrInfo>.root
 
 recoType: allDecays
 refFrame: LAB (lab frame) or MRF (muon rest frame)
@@ -18,65 +18,12 @@ Notes:
 
 */
 
-#include <iostream>
-#include <vector>
-
+#include "../Common/Utils.h"
 #include "Plotter.h"
-#include "TFile.h"
-#include "TTree.h"
-#include "TTreeReader.h"
-#include "TH1D.h"
-#include "TH2D.h"
-#include "TMath.h"
-#include "TVector3.h"
-#include "TLorentzVector.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "TRandom3.h"
-#include "TGraph2D.h"
-
-using namespace std;
-
-// Constants (updated Oct 2023)
-double omega_a = 1.439337; // This is the unweighted average for FNAL Run-2/3 in rad/us, where the uncertainty is 9.521669287914112e-07 rad/us. I used 1.439311 rad/us from BNL in my thesis.
-double g2Period = TMath::TwoPi() / omega_a; // us
-double mMu = 105.6583715; // MeV
-double aMu = 116592059e-11; // This is the combined BNL and FNAL Run-2/3 result. Previously used 116592089e-11 from BNL. 
-double gmagic = std::sqrt( 1.+1./aMu );
-double pmax = 1.01 * mMu * gmagic; 
-double eMass = 0.510999;
-double T_c = 149.2 * 1e-3; // cyclotron period [us]
 
 // Lower and upper momentum analysis cuts.
 double pLo = 1000; 
 double pHi = 2500;
-
-// Open ROOT tree and load branches
-TTree *InitTree(string fileName, string treeName) { 
-
-  // Get file
-  TFile *fin = TFile::Open(fileName.c_str());
-  cout<<"\nOpened tree:\t"<<fileName<<" "<<fin<<endl;
-
-  // Get tree
-  TTree *tree = (TTree*)fin->Get(treeName.c_str());
-
-  cout<<"\nOpened tree:"<<treeName<<" "<<tree<<" from file "<<fileName<<" "<<fin<<endl;
-
-  return tree;
-
-}
-
-// Modulate time over some number of g-2 periods
-double ModTime(double time, int nPeriods = 1) {
-
-  double g2fracTime = time / (nPeriods * g2Period);
-  int g2fracTimeInt = int(g2fracTime);
-  double g2ModTime = (g2fracTime - g2fracTimeInt) * nPeriods * g2Period;
-
-  return g2ModTime;
-
-}
 
 // Randomise out the fast rotation
 double RandomisedTime(TRandom3 *rand, double time) { 
@@ -135,14 +82,15 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   TH1D *momentum = new TH1D("Momentum", ";Momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
   TH1D *momY = new TH1D("MomentumY", ";Momentum Y [MeV];Tracks", 1000, -60, 60); 
   TH2D *decayZ_vs_decayX = new TH2D("DecayZ_vs_DecayX", ";Decay position X [mm];Decay position Z [mm]", 800, -8000, 8000, 800, -8000, 8000);
-  TH1D *wiggle = new TH1D("Wiggle", ";Decay time [#mus];Tracks", 2700, 0, 2700*T_c); // T-method momentum range
-  TH1D *wiggle_mod = new TH1D("Wiggle_Modulo", ";t_{g#minus2}^{mod} [#mus];Decays / 149.2 ns", 29, 0, g2Period); 
+  TH1D *wiggle = new TH1D("Wiggle", ";Decay time [#mus];Tracks", 2700, 0, 2700*T_c); 
+  TH1D *wiggle_mod_A = new TH1D("Wiggle_Modulo_A", ";t_{g#minus2}^{mod} [#mus];Decays / 149.2 ns", 29, 0, g2Period); // Using T-method momentum cut, to obtain phase
+  TH1D *wiggle_mod_B = new TH1D("Wiggle_Modulo_B", ";t_{g#minus2}^{mod} [#mus];Decays / 149.2 ns", 29, 0, g2Period); // Using EDM momentum cuts, for theta_y fit demoninator 
   TH1D *thetaY = new TH1D("ThetaY", ";#theta_{y} [mrad];Decays", 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time = new TH2D("ThetaY_vs_Time", ";Decay time [#mus]; #theta_{y} [mrad] / 149.2 ns ", 2700, 0, 2700*T_c, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_time_mod = new TH2D("ThetaY_vs_Time_Modulo", ";t_{g#minus2}^{mod} [#mus]; #theta_{y} [mrad] / 149.2 ns", 29, 0, g2Period, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
   TH2D *thetaY_vs_Y = new TH2D("ThetaY_vs_Y", ";Decay y-position [mm];#theta_{y} [mrad]", 24, -60, 60, 40, -100, 100);
-  TH2D *thetaY_vs_momentum_noCuts = new TH2D("ThetaY_vs_Momentum_NoCuts", ";Decay momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
-  TH2D *thetaY_vs_momentum = new TH2D("ThetaY_vs_Momentum", ";Decay momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 300, 0, 3000, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+  TH2D *thetaY_vs_momentum_noCuts = new TH2D("ThetaY_vs_Momentum_NoCuts", ";Decay momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 312, 0, 3120, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
+  TH2D *thetaY_vs_momentum = new TH2D("ThetaY_vs_Momentum", ";Decay momentum [MeV]; #theta_{y} [mrad] / 10 MeV ", 312, 0, 3120, 1000, -TMath::Pi()*boostFactor, TMath::Pi()*boostFactor);
 
   // Momentum scans
   vector<TH1D*> thetaY_mom_slices_;
@@ -317,28 +265,26 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
     // T-method energy cut 
     if(p > 1700) { 
       wiggle->Fill(time);
-      wiggle_mod->Fill(g2ModTime);
+      wiggle_mod_A->Fill(g2ModTime);
     } 
 
     // EDM cuts
     if(momCuts && p > pLo*momBoostFactor && p < pHi*momBoostFactor) { 
-
       momentum->Fill(p);
       thetaY->Fill(theta_y, acceptanceWeighting);
       thetaY_vs_time->Fill(time, theta_y, acceptanceWeighting);
       thetaY_vs_time_mod->Fill(g2ModTime, theta_y, acceptanceWeighting);
       thetaY_vs_momentum->Fill(p, theta_y, acceptanceWeighting);
       thetaY_vs_Y->Fill(y, theta_y, acceptanceWeighting);
-
-    } else if(!momCuts) { 
-
+      wiggle_mod_B->Fill(g2ModTime);
+    } else if (!momCuts) { 
       momentum->Fill(p);
       thetaY->Fill(theta_y, acceptanceWeighting);
       thetaY_vs_time->Fill(time, theta_y, acceptanceWeighting);
       thetaY_vs_time_mod->Fill(g2ModTime, theta_y, acceptanceWeighting);
       thetaY_vs_momentum->Fill(p, theta_y, acceptanceWeighting);
       thetaY_vs_Y->Fill(y, theta_y, acceptanceWeighting);
-
+      wiggle_mod_B->Fill(g2ModTime);
     }
 
     // Slice momentum 
@@ -386,7 +332,8 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   momentum_noCuts->Write();
   momentum->Write();
   wiggle->Write();
-  wiggle_mod->Write();
+  wiggle_mod_A->Write();
+  wiggle_mod_B->Write();
   thetaY->Write();
   thetaY_vs_time->Write();
   thetaY_vs_momentum->Write();
@@ -417,6 +364,16 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   return;
 
 }
+
+/*
+
+Run test:
+./Plotter.out /pnfs/GM2/persistent/EDM/MC/dMu/Trees/AllDecays/5.4e-18/decaySimTrees_000.root output/test.root None
+
+Run full:
+. submit.sh 3 None
+
+*/
 
 
 int main(int argc, char *argv[]) {
