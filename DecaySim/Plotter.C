@@ -25,11 +25,6 @@ Notes:
 double pLo = 1000; 
 double pHi = 2500;
 
-// Randomise out the fast rotation
-double RandomisedTime(TRandom3 *rand, double time) { 
-  return rand->Uniform(time-T_c/2, time+T_c/2);
-}
-
 // Acceptance weighting using Delaunay interpolation 
 // https://root.cern.ch/doc/master/classTGraph2D.html#a0dfb623f2a9f55c98ebe323384cf3f0d
 double AcceptanceWeighting(TGraph2D *map, double y, double theta_y) {
@@ -48,13 +43,13 @@ double AcceptanceWeighting(TGraph2D *map, double y, double theta_y) {
 // Run plotting
 void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bool randCorr, bool vertCorr, bool accWeight, string stn) {
 
+  // CORRECTION HISTOGRAMS NEED TO BE REGENERATED AND UPDATED 
+
   // Get vertical offset correction histograms 
-  // THIS NEED TO BE REGENERATED AND UPDATED 
   TString verticalOffsetFileName = "correctionHists/verticalOffsetHists_allDecays_WORLD_250MeV_AQ.root";
   TFile *verticalOffsetFile = TFile::Open(verticalOffsetFileName);
   TH1D *verticalOffsetHist = (TH1D*)verticalOffsetFile->Get("VerticalOffsetHists/ThetaY_vs_p");
 
-  // THIS NEED TO BE REGENERATED AND UPDATED 
   TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.thetaYvsY.truth.root";
   TFile *acceptanceFile = TFile::Open(acceptanceFileName);
 
@@ -77,7 +72,6 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   // Book histograms
 
   cout<<"---> Booking histograms"<<endl;
-
   TH1D *momentum_noCuts = new TH1D("Momentum_NoCuts", ";Momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); // Prior to any cuts
   TH1D *momentum = new TH1D("Momentum", ";Momentum [MeV];Tracks", int(pmax), 0, pmax*momBoostFactor); 
   TH1D *momY = new TH1D("MomentumY", ";Momentum Y [MeV];Tracks", 1000, -60, 60); 

@@ -1,12 +1,13 @@
+# Submit histogramming jobs, read from ROOT ntuples on /pnfs
+
+nCores=$1
+dataset=$2
+
 # Get arguments (sam dataset and number of cores to use)
 if [ "$#" -ne 2 ]; then
   echo "Dataset and number of and cores required as arguments. EG: . submit.sh Run-1a 2 "
   return
 fi
-
-dataset=$1 
-nCores=$2
-
 
 if [[ $dataset == "Run-1a" ]]; then
   datasetName="gm2pro_daq_full_run1_60h_5039A_GLdocDB16021-v2"
@@ -33,7 +34,7 @@ fi
 
 dir="/gm2/data/g2be/Production/Trees/Run1" 
 
-echo "Run, Subruns, All fills, Laser fills, Tracks, Quality tracks, Vertices, Quality vertices"
+# echo "Run, Subruns, All fills, Laser fills, Tracks, Quality tracks, Vertices, Quality vertices"
 
 for run in `cat txt/${datasetName}.txt`; do
   
@@ -41,9 +42,13 @@ for run in `cat txt/${datasetName}.txt`; do
   
 done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
-sleep 2
+# Adjust output format
+if [ $dataset == "Run-1d" ]; then
+  hadd -f edmPlots_${dataset}_50usStartTime_250MeV_randCorr_BQ.root ${datasetName}/trackRecoPlots_*.root 
+else
+  hadd -f edmPlots_${dataset}_250MeV_randCorr_BQ.root ${datasetName}/trackRecoPlots_*.root  
+fi
 
-rm -f edmPlots_${dataset}_250MeV_1000_2500MeV_randomised_BQ.root && hadd -f rm -f edmPlots_${dataset}_250MeV_1000_2500MeV_randomised_BQ.root ${datasetName}/trackRecoPlots_*.root
 
 # hadd -f thetaYvsMomentum_${dataset}_BQ_noVertCorr.root ${datasetName}/trackRecoPlots_*.root
 

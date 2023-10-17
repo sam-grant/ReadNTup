@@ -12,8 +12,10 @@ Common includes and constants.
 #include "TFile.h"
 #include "TTree.h"
 #include "TTreeReader.h"
+#include "TF1.h"
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TGraphErrors.h"
 #include "TGraph2D.h"
 #include "TMath.h"
 #include "TVector3.h"
@@ -62,4 +64,9 @@ double ModTime(double time, int nPeriods = 1) {
 
   return g2ModTime;
 
+}
+
+// Randomise out the fast rotation
+double RandomisedTime(TRandom3 *rand, double time) { 
+  return rand->Uniform(time-T_c/2, time+T_c/2);
 }

@@ -22,10 +22,6 @@ alignInfo: plus1mm, minus1mm, plus0.1deg, minus0.1deg
 double pLo = 1000; 
 double pHi = 2500;
 
-double RandomisedTime(TRandom3 *rand, double time) { 
-  return rand->Uniform(time-T_c/2, time+T_c/2);
-}
-
 void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, bool truth, bool randCorr, bool vertCorr) {
 
   // Get vertical offset correction file
@@ -70,7 +66,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
   TH2D *thetaY_vs_momentum_vertexCuts_[n_stn];
   TH2D *thetaY_vs_momentum_allCuts_[n_stn];
 
-  // Momentum bins
+  // Momentum binned analysis
   vector<TH1D*> thetaY_mom_slices_[n_stn];
   vector<TH1D*> Y_mom_slices_[n_stn];
   vector<TH1D*> pY_mom_slices_[n_stn];
@@ -220,7 +216,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
     thetaY_vs_momentum_vertexCuts_[stn_id]->Fill(p, theta_y);
     decayX_vs_decayZ_[stn_id]->Fill(z, x);
 
-    // T-method energy cut. See Fienberg thesis figure 2.10, or ask basically anyone... 
+    // T-method energy cut. See Fienberg thesis figure 2.10.
     if(p > 1700  && p < pmax) {
       wiggle_[stn_id]->Fill(time);
       wiggle_mod_A_[stn_id]->Fill(g2ModTime);
@@ -291,7 +287,7 @@ void Run(TTree *tree, TFile *output, bool quality, bool timeCuts, bool momCuts, 
   thetaY_[1]->Add(thetaY_[3], thetaY_[4]);
   thetaY_vs_time_[1]->Add(thetaY_vs_time_[3], thetaY_vs_time_[4]);
   thetaY_vs_time_mod_[1]->Add(thetaY_vs_time_mod_[3], thetaY_vs_time_mod_[4]);
-  decayX_vs_decayZ_[1]->Add(decayX_vs_decayZ_[4], decayX_vs_decayZ_[4]);
+  decayX_vs_decayZ_[1]->Add(decayX_vs_decayZ_[3], decayX_vs_decayZ_[4]);
   momY_[1]->Add(momY_[3], momY_[4]);
   thetaY_vs_momentum_noCuts_[1]->Add(thetaY_vs_momentum_noCuts_[3], thetaY_vs_momentum_noCuts_[4]);
   thetaY_vs_momentum_vertexCuts_[1]->Add(thetaY_vs_momentum_vertexCuts_[3], thetaY_vs_momentum_vertexCuts_[4]);
