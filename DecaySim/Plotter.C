@@ -50,7 +50,7 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
   TFile *verticalOffsetFile = TFile::Open(verticalOffsetFileName);
   TH1D *verticalOffsetHist = (TH1D*)verticalOffsetFile->Get("VerticalOffsetHists/ThetaY_vs_p");
 
-  TString acceptanceFileName = "correctionHists/acceptanceWeightingPlots.thetaYvsY.truth.root";
+  TString acceptanceFileName = "correctionHists/acceptanceMaps.thetaYvsY.truth.root"; // "correctionHists/acceptanceWeightingPlots.thetaYvsY.truth.root";
   TFile *acceptanceFile = TFile::Open(acceptanceFileName);
 
   cout<<"---> Opened correction files"<<endl;
@@ -265,6 +265,7 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
     // EDM cuts
     if(momCuts && p > pLo*momBoostFactor && p < pHi*momBoostFactor) { 
       momentum->Fill(p);
+      momY->Fill(py);
       thetaY->Fill(theta_y, acceptanceWeighting);
       thetaY_vs_time->Fill(time, theta_y, acceptanceWeighting);
       thetaY_vs_time_mod->Fill(g2ModTime, theta_y, acceptanceWeighting);
@@ -273,6 +274,7 @@ void Run(TTree *tree, TFile *output, bool momCuts, bool timeCuts, bool boost, bo
       wiggle_mod_B->Fill(g2ModTime);
     } else if (!momCuts) { 
       momentum->Fill(p);
+      momY->Fill(py);
       thetaY->Fill(theta_y, acceptanceWeighting);
       thetaY_vs_time->Fill(time, theta_y, acceptanceWeighting);
       thetaY_vs_time_mod->Fill(g2ModTime, theta_y, acceptanceWeighting);

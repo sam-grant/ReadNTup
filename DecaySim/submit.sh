@@ -33,8 +33,8 @@ done | xargs -i --max-procs=$nCores bash -c ". run.sh {}"
 
 # --- From Plotter.C ---
 # Output format: edmPlots_<refFrame>_<recoType>_<binWidth>_<qualityInfo>_<corrInfo>.root
-rm -f edmPlots_allDecays_LAB_250MeV_noQ_randCorr.root && hadd -f edmPlots_allDecays_LAB_250MeV_noQ_randCorr.root ${outDir}/plots_*.root
-
+# hadd -f edmPlots_allDecays_LAB_250MeV_noQ_randCorr.root ${outDir}/plots_*.root
+hadd -f edmPlots_allDecays_LAB_250MeV_noQ_randCorr_accWeight${stn}.root ${outDir}/plots_*.root
 
 # rm -f edmPlots_allDecays_LAB_250MeV_noQ_accWeight${stn}.root && hadd -f edmPlots_allDecays_LAB_250MeV_noQ_accWeight${stn}.root ${outDir}/plots_*.root
 # rm -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_accWeight${stn}_full.root && hadd -f edmPlots_allDecays_WORLD_250MeV_AQ_noVertCorr_accWeight${stn}_full.root ${outDir}/plots_*.root

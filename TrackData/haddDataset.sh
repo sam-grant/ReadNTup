@@ -1,3 +1,5 @@
+# Typically a regular hadd command is enough, but this is nice to have. 
+
 # Hadd files in FileList_12345.txt (made by haddSubRunsSAMList.sh)
 
 # Get dataset from argument
@@ -22,3 +24,6 @@ done
 
 # Hadd these files (using Joe's script that does a few at a time)
 . hadd.sh edmPlots_${dataset}.root $files
+
+
+
