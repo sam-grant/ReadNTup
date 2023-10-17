@@ -11,3 +11,4 @@ attic
 */Images
 */*~
 */*.root
+.DS_store

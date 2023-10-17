@@ -17,11 +17,8 @@ fi
 files=""
 
 for file in `ls $datasetName`; do
-
   files=$files" "${datasetName}/$file
-
 done
 
-# vaecho $files
-# Hadd these files (using Joe's script that does a few at 
-hadd.sh edmPlots_${dataset}.root $files
+# Hadd these files (using Joe's script that does a few at a time)
+. hadd.sh edmPlots_${dataset}.root $files

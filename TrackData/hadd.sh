@@ -76,4 +76,4 @@ else
 fi
 
 # Remove the intermediate files
-rm -f *part*
+rm -f *root.part*
