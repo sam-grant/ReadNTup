@@ -188,7 +188,10 @@ void Run(TTree *tree, TFile *output, string dataset="Run-1a", bool quality=true,
     thetaY_vs_momentum_noCuts_[stn_id]->Fill(p, theta_y);
 
     // Cuts 
-    if (timeCuts && time < g2Period*7) continue; // Early time cut
+    if (timeCuts) { // Early time cut
+      if (time < 7*g2Period) continue; 
+      if (dataset=="Run-1d" && time < 12*g2Period) continue; // Late start for Run-1d
+    }
     if (quality) { // Quality cuts
       // Includes hit vol and pval cuts 
       // Cuts defined here: https://cdcvs.fnal.gov/redmine/projects/gm2tracker/repository/revisions/develop/entry/quality/TrackQuality_service.cc
