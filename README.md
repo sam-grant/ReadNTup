@@ -1,6 +1,6 @@
 # ReadNTup
 
-**NOTE: refer to the run1-paper branch for recent updates!
+**NOTE: refer to the run1_paper branch for recent updates!
 
 **The purpose of this repository is the read in data/simulation in the form of ROOT Ntuples and output analysis level histograms.** 
 
