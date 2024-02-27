@@ -1,5 +1,7 @@
 # ReadNTup
 
+**NOTE: refer to the run1-paper branch for recent updates!
+
 **The purpose of this repository is the read in data/simulation in the form of ROOT Ntuples and output analysis level histograms.** 
 
 - The core of each directory is a `Plotter.C`, a `Plotter.h`, a `Makefile`, and `submit.sh`/`run.sh` scripts. 
